@@ -39,11 +39,26 @@ export default function Home() {
       if (event.data && event.data.type === 'oauth-connected') {
         setServices(s => ({ ...s, [event.data.service]: true }));
         setMessage(`✅ ${event.data.service} connected!`);
+
+        // For Google: also trigger employee provisioning (GDrive folders + GBrain)
+        if (event.data.service === 'google' && userId) {
+          fetch(`https://dias-mac-studio.tail4f36cb.ts.net/webhooks/onboard`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              userId: userId,
+              slackId: userId,
+              service: 'google',
+            }),
+          }).catch(() => {
+            // Non-fatal: server-side call in Google OAuth handler is the primary trigger
+          });
+        }
       }
     };
     window.addEventListener('message', handler);
     return () => window.removeEventListener('message', handler);
-  }, []);
+  }, [userId]);
 
   const saveGranolaKey = async () => {
     if (!userId || !granolaKey) return;

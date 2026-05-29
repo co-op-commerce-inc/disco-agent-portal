@@ -1,10 +1,12 @@
 import { NextApiRequest, NextApiResponse } from 'next';
+import { createHmac } from 'crypto';
 
 const GOOGLE_CLIENT_ID = '437927730977-t2hkbs73o06fqoiurpuok06eeg0umlnj.apps.googleusercontent.com';
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || '';
 const REDIRECT_URI = 'https://disco-agent-portal.vercel.app/api/oauth/google';
-const SCOPE = 'https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/drive.readonly';
+const SCOPE = 'https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/drive';
 const WEBHOOK_BASE = 'https://dias-mac-studio.tail4f36cb.ts.net/webhooks';
+const WEBHOOK_SECRET = 'XmNJhcvbY596Ue9jK4c3LsDQRoiKK3CmnUo238c9g94';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { code, state, user } = req.query;
@@ -46,6 +48,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         });
       } catch (webhookErr) {
         console.error('Webhook forward failed (non-fatal):', webhookErr);
+      }
+
+      // Also trigger employee provisioning: create GDrive folders + GBrain context
+      try {
+        const body = JSON.stringify({
+          userId: state,
+          slackId: state,
+          googleTokens: tokens,
+        });
+        const signature = createHmac('sha256', WEBHOOK_SECRET).update(body).digest('hex');
+        await fetch(`${WEBHOOK_BASE}/onboard`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Hermes-Signature': signature,
+          },
+          body,
+        });
+        console.log(`Onboard webhook triggered for user ${state}`);
+      } catch (onboardErr) {
+        console.error('Onboard webhook call failed (non-fatal):', onboardErr);
       }
 
       // Close the popup and notify the parent window
