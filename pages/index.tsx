@@ -2,9 +2,16 @@ import { useState } from 'react';
 
 const GOOGLE_CLIENT_ID = '437927730977-t2hkbs73o06fqoiurpuok06eeg0umlnj.apps.googleusercontent.com';
 
+function getUrlParam(key: string): string {
+  if (typeof window === 'undefined') return '';
+  return new URLSearchParams(window.location.search).get(key) || '';
+}
+
 export default function Home() {
+  // Auto-detect user from URL params (Slack OAuth callback) or local storage
+  const [userId, setUserId] = useState(() => getUrlParam('id') || getUrlParam('userId') || '');
+  const [userName, setUserName] = useState(() => getUrlParam('name') || '');
   const [tab, setTab] = useState<'services'|'profile'|'style'|'projects'|'guide'>('guide');
-  const [userId, setUserId] = useState('');
   const [saved, setSaved] = useState(false);
   const [profile, setProfile] = useState({ role: '', team: '', timezone: 'America/Los_Angeles', focus: '', goals: '', collaborators: '' });
   const [style, setStyle] = useState({ verbosity: 'concise', proactivity: 'medium', humor: 'medium', format: 'bullets', emoji: true });
@@ -47,6 +54,33 @@ export default function Home() {
     });
     setSaved(true); setMessage('Profile saved! Rhythm will use this to personalize your experience.');
   };
+
+  if (!userId) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)', fontFamily: 'system-ui' }}>
+        <div style={{ textAlign: 'center', color: 'white', maxWidth: 420 }}>
+          <h1 style={{ fontSize: 64, margin: 0, letterSpacing: -2 }}>Rhythm</h1>
+          <p style={{ fontSize: 20, opacity: 0.9, marginTop: 8 }}>Your Disco AI agent</p>
+          <p style={{ fontSize: 14, opacity: 0.7, marginTop: 16 }}>
+            Connect your accounts, set your preferences, and make Rhythm yours.
+          </p>
+          <a href={`https://slack.com/oauth/v2/authorize?client_id=879184060177.11209135000535&scope=openid,profile,email&redirect_uri=${encodeURIComponent('https://disco-agent-portal.vercel.app/api/oauth/slack')}`}
+            style={{ display: 'inline-block', marginTop: 32, padding: '14px 40px', fontSize: 18,
+              background: 'white', color: '#1a1a2e', border: 'none', borderRadius: 8,
+              cursor: 'pointer', fontWeight: 600, textDecoration: 'none' }}>
+            <span style={{ marginRight: 8 }}>🔗</span> Sign in with Slack
+          </a>
+          <p style={{ fontSize: 13, opacity: 0.5, marginTop: 32 }}>
+            Or enter your Slack User ID manually
+          </p>
+          <input placeholder="URTU2JQCT" 
+            onChange={e => { if (e.target.value.length > 8) setUserId(e.target.value); }}
+            style={{ marginTop: 8, padding: '10px 16px', borderRadius: 8, border: 'none', fontSize: 16, width: 200, textAlign: 'center' }} />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ maxWidth: 640, margin: '0 auto', padding: 40, fontFamily: 'system-ui', background: '#fafafa', minHeight: '100vh' }}>
