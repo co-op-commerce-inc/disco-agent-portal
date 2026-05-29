@@ -4,7 +4,7 @@ import { createHmac } from 'crypto';
 const GOOGLE_CLIENT_ID = '437927730977-b69f4i1bje208hcib6bsu4jvfbo1hacj.apps.googleusercontent.com';
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || '';
 const REDIRECT_URI = 'https://disco-agent-portal.vercel.app/api/oauth/google';
-const SCOPE = 'https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/drive';
+const SCOPE = 'https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/drive.readonly';
 const WEBHOOK_BASE = 'https://dias-mac-studio.tail4f36cb.ts.net/webhooks';
 const WEBHOOK_SECRET = 'XmNJhcvbY596Ue9jK4c3LsDQRoiKK3CmnUo238c9g94';
 
