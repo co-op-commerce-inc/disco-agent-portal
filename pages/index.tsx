@@ -1,6 +1,4 @@
-import { useState } from 'react';
-
-const GOOGLE_CLIENT_ID = '437927730977-t2hkbs73o06fqoiurpuok06eeg0umlnj.apps.googleusercontent.com';
+import { useState, useEffect } from 'react';
 
 function getUrlParam(key: string): string {
   if (typeof window === 'undefined') return '';
@@ -28,13 +26,24 @@ export default function Home() {
     { key: 'guide', label: '🚀 Guide' },
   ];
 
-  const connectGoogle = () => {
+  const connectOAuth = (service: string) => {
     if (!userId) { setMessage('Enter your Slack User ID first'); return; }
-    const scope = 'https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/drive.readonly';
-    const redirect = 'https://dias-mac-studio.tail4f36cb.ts.net/webhooks/oauth-google';
-    window.open(`https://accounts.google.com/o/oauth2/auth?client_id=${GOOGLE_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirect)}&response_type=code&scope=${encodeURIComponent(scope)}&access_type=offline&prompt=consent&state=${userId}`);
-    setMessage('Approve the Google prompt in the window that opened');
+    const popup = window.open(`/api/oauth/${service}?user=${userId}`, `${service}-oauth`, 'width=600,height=700');
+    if (!popup) { setMessage('Please allow popups for this site'); return; }
+    setMessage(`Approve the ${service} prompt in the window that opened`);
   };
+
+  // Listen for postMessage from OAuth popup windows
+  useEffect(() => {
+    const handler = (event: MessageEvent) => {
+      if (event.data && event.data.type === 'oauth-connected') {
+        setServices(s => ({ ...s, [event.data.service]: true }));
+        setMessage(`✅ ${event.data.service} connected!`);
+      }
+    };
+    window.addEventListener('message', handler);
+    return () => window.removeEventListener('message', handler);
+  }, []);
 
   const saveGranolaKey = async () => {
     if (!userId || !granolaKey) return;
@@ -119,7 +128,7 @@ export default function Home() {
                 <div><strong>{s.name}</strong><div style={{ color: '#888', fontSize: 13 }}>{s.desc}</div></div>
               </div>
               {services[s.key] ? <span style={{ color: '#10b981', fontSize: 13 }}>✅ Connected</span> : (
-                <button onClick={s.key === 'google' ? connectGoogle : () => window.open(`/api/oauth/github?user=${userId}`)}
+                <button onClick={() => connectOAuth(s.key)}
                   style={{ background: s.color, color: 'white', border: 'none', padding: '8px 14px', borderRadius: 6, cursor: 'pointer', fontSize: 13 }}>Connect</button>
               )}
             </div>
