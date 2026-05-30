@@ -12,144 +12,170 @@ const STEPS = [
     key: 'welcome',
     label: 'Overview',
     eyebrow: 'Start here',
-    title: 'Set up the agent that works beside you.',
-    summary:
-      'This portal connects your work systems, gives the agent basic context about your role, and sets expectations for how it should communicate.',
-    why:
-      'The agent is most useful when it can see the same signals you already use: Slack identity, calendar and email, code activity, meeting notes, and your current priorities.',
-    outcome: 'You will leave with a Slack-ready agent, a saved profile, and a clear next step.',
+    title: 'Set up your Disco agent',
+    summary: 'Create the profile your agent will use in Slack, meetings, code reviews, and daily work.',
+    why: 'A useful agent needs identity, context, and preferences before it can help without constantly asking follow-up questions.',
+    outcome: 'You will know what is being connected, why it matters, and what the agent can do next.',
   },
   {
     key: 'slack',
-    label: 'Identity',
+    label: 'Slack identity',
     eyebrow: 'Required',
-    title: 'Tell the agent who you are in Slack.',
-    summary:
-      'Slack is the home base. This identity lets the agent recognize your DMs, personalize responses, and route setup data to the right profile.',
-    why:
-      'Without a Slack user ID, the agent cannot reliably connect these settings to the person who will actually use it.',
-    outcome: 'Your profile is anchored to a Slack member ID.',
+    title: 'Anchor the agent to your Slack identity',
+    summary: 'Slack is where you will talk to the agent. This step tells it which person these settings belong to.',
+    why: 'The Slack ID connects every permission, profile answer, and saved preference to the right teammate.',
+    outcome: 'Your agent can recognize you in DMs, mentions, briefings, and setup callbacks.',
   },
   {
     key: 'google',
-    label: 'Calendar and mail',
+    label: 'Google',
     eyebrow: 'Recommended',
-    title: 'Connect Google for schedule and inbox context.',
-    summary:
-      'Google gives the agent enough context to help with calendar questions, meeting prep, follow-ups, and email summaries.',
-    why:
-      'Most useful agent work starts with time and context: what is coming up, what changed, and what needs attention.',
-    outcome: 'The agent can reason over the Google permissions you grant.',
+    title: 'Give the agent schedule and inbox context',
+    summary: 'Connect Google so the agent can help with calendar questions, meeting prep, email summaries, and Drive context.',
+    why: 'Calendar and email are usually where commitments, blockers, and follow-ups first appear.',
+    outcome: 'The agent can reason over the Google access you approve.',
   },
   {
     key: 'github',
-    label: 'Code context',
-    eyebrow: 'Recommended for builders',
-    title: 'Connect GitHub for repo and PR awareness.',
-    summary:
-      'GitHub lets the agent help with pull requests, code search, issue context, and summaries of engineering work.',
-    why:
-      'When code activity is connected, the agent can answer questions with project context instead of generic guesses.',
-    outcome: 'The agent can reference your connected GitHub workspace.',
+    label: 'GitHub',
+    eyebrow: 'Recommended',
+    title: 'Let the agent understand code work',
+    summary: 'Connect GitHub so the agent can explain pull requests, search repositories, and summarize engineering activity.',
+    why: 'Code context keeps the agent grounded in the actual work instead of generic project guesses.',
+    outcome: 'The agent can reference connected repos, PRs, issues, and code changes.',
   },
   {
     key: 'granola',
-    label: 'Meetings',
+    label: 'Granola',
     eyebrow: 'Optional',
-    title: 'Connect Granola for meeting memory.',
-    summary:
-      'Granola notes help the agent remember decisions, commitments, and follow-ups that usually disappear after a meeting ends.',
-    why:
-      'Meeting context turns the agent from a question-answering tool into something that can help keep momentum.',
-    outcome: 'Meeting notes and action items can become part of the agent context.',
+    title: 'Add meeting memory',
+    summary: 'Connect Granola if you want the agent to use notes, transcripts, decisions, and follow-ups from meetings.',
+    why: 'Meeting memory helps the agent recover decisions and keep momentum after a conversation ends.',
+    outcome: 'Meeting notes can become searchable context for future asks.',
   },
   {
     key: 'profile',
     label: 'Work profile',
     eyebrow: 'Personalization',
-    title: 'Give the agent your operating context.',
-    summary:
-      'A short profile tells the agent what you do, what you are focused on, and what outcomes matter right now.',
-    why:
-      'The same information can be urgent for one person and noise for another. Your profile helps the agent prioritize.',
-    outcome: 'Responses can be tailored to your role, team, timezone, and goals.',
+    title: 'Describe what matters in your work',
+    summary: 'Share your role, team, focus, and goals so the agent can prioritize information like a teammate would.',
+    why: 'The same signal can be urgent for one role and noise for another. Profile context teaches the agent the difference.',
+    outcome: 'Answers can be tailored around your responsibilities, timezone, and current priorities.',
   },
   {
     key: 'style',
-    label: 'Behavior',
+    label: 'Agent behavior',
     eyebrow: 'Preferences',
-    title: 'Choose how the agent should show up.',
-    summary:
-      'Tune response length, proactivity, formatting, and tone so the agent matches your working style from day one.',
-    why:
-      'A useful agent should not make you repeatedly correct its voice, pacing, or level of detail.',
-    outcome: 'Your communication preferences are saved with the profile.',
+    title: 'Choose how the agent should respond',
+    summary: 'Set response depth, proactivity, structure, and tone so the agent starts with your preferred defaults.',
+    why: 'The interaction should feel right without you correcting length, format, or initiative every day.',
+    outcome: 'Your saved preferences shape day-to-day Slack responses.',
   },
   {
     key: 'done',
     label: 'Ready',
     eyebrow: 'Complete',
-    title: 'Your agent setup is ready.',
-    summary:
-      'You have created the profile the agent will use when it works with you in Slack and across connected services.',
-    why:
-      'This summary is your handoff point: what is connected, what was skipped, and how to start using the agent.',
-    outcome: 'Start in Slack, then come back anytime to adjust the setup.',
+    title: 'Your agent profile is ready',
+    summary: 'Review what is connected, what was skipped, and how to start using the agent in Slack.',
+    why: 'A clean handoff makes the setup feel finished and gives you a place to return when preferences change.',
+    outcome: 'DM the agent in Slack and come back here anytime to adjust setup.',
   },
 ] as const;
 
 type StepKey = (typeof STEPS)[number]['key'];
 type ServiceName = 'google' | 'github' | 'granola';
+type ProfileKey = 'role' | 'team' | 'timezone' | 'focus' | 'goals';
+type StyleKey = 'verbosity' | 'proactivity' | 'format';
 
-const SERVICE_COPY: Record<
+const SERVICES: Record<
   ServiceName,
-  { label: string; gains: string[]; note: string; connectLabel: string }
+  {
+    label: string;
+    short: string;
+    benefits: string[];
+    permission: string;
+  }
 > = {
   google: {
-    label: 'Google',
-    gains: [
+    label: 'Google Workspace',
+    short: 'Calendar, Gmail, and Drive context',
+    benefits: [
       'Find open time and understand calendar conflicts',
-      'Summarize email threads and surface follow-ups',
-      'Use Drive context when files and projects matter',
+      'Summarize email threads and identify follow-ups',
+      'Use Drive files when project context matters',
     ],
-    note: 'You stay in control of the permissions granted in the Google consent screen.',
-    connectLabel: 'Connect Google',
+    permission: 'You approve the exact Google scopes in the consent window.',
   },
   github: {
     label: 'GitHub',
-    gains: [
-      'Review and summarize pull requests',
-      'Search code and explain project structure',
-      'Track issues and changes across repositories',
+    short: 'Repositories, PRs, and issue context',
+    benefits: [
+      'Explain and summarize pull requests',
+      'Search code with repository context',
+      'Track issues and engineering changes',
     ],
-    note: 'Use the OAuth prompt to grant repo access appropriate for your work.',
-    connectLabel: 'Connect GitHub',
+    permission: 'Grant only the GitHub workspace access you want the agent to use.',
   },
   granola: {
     label: 'Granola',
-    gains: [
-      'Summarize meeting notes and transcripts',
+    short: 'Meeting notes and transcripts',
+    benefits: [
       'Recover decisions from past conversations',
+      'Summarize notes before or after meetings',
       'Track action items without manual copy-paste',
     ],
-    note: 'Paste your Granola API key only if you want meeting memory connected now.',
-    connectLabel: 'Save Granola key',
+    permission: 'Paste an API key only if you want meeting memory connected now.',
   },
 };
 
-const PROFILE_FIELDS = [
-  { key: 'role', label: 'Role', placeholder: 'Product Engineer', hint: 'What should the agent assume you are responsible for?' },
-  { key: 'team', label: 'Team', placeholder: 'Marketplace', hint: 'Which group should context be organized around?' },
-  { key: 'timezone', label: 'Timezone', placeholder: 'America/Los_Angeles', hint: 'Used for briefings, reminders, and scheduling.' },
-  { key: 'focus', label: 'Current focus', placeholder: 'Q2 planning, auction model', hint: 'The top one or two things you are actively driving.' },
-  { key: 'goals', label: 'Goals', placeholder: 'Ship auction V2 by end of month', hint: 'Outcomes the agent should help protect.' },
-] as const;
+const PROFILE_FIELDS: Array<{
+  key: ProfileKey;
+  label: string;
+  placeholder: string;
+  help: string;
+}> = [
+  {
+    key: 'role',
+    label: 'Role',
+    placeholder: 'Product Engineer',
+    help: 'What should the agent assume you are responsible for?',
+  },
+  {
+    key: 'team',
+    label: 'Team',
+    placeholder: 'Marketplace',
+    help: 'Which team or function should context be organized around?',
+  },
+  {
+    key: 'timezone',
+    label: 'Timezone',
+    placeholder: 'America/Los_Angeles',
+    help: 'Used for scheduling, reminders, and briefings.',
+  },
+  {
+    key: 'focus',
+    label: 'Current focus',
+    placeholder: 'Q2 planning, agent onboarding, auction model',
+    help: 'The active projects the agent should keep in mind.',
+  },
+  {
+    key: 'goals',
+    label: 'Goals',
+    placeholder: 'Ship onboarding V2 and reduce setup friction',
+    help: 'Outcomes the agent should help protect.',
+  },
+];
 
-const STYLE_FIELDS = [
+const STYLE_FIELDS: Array<{
+  key: StyleKey;
+  label: string;
+  help: string;
+  options: Array<{ value: string; label: string }>;
+}> = [
   {
     key: 'verbosity',
     label: 'Response depth',
-    desc: 'How much context should the agent include by default?',
+    help: 'How much context should the agent include by default?',
     options: [
       { value: 'concise', label: 'Concise' },
       { value: 'detailed', label: 'Detailed' },
@@ -158,7 +184,7 @@ const STYLE_FIELDS = [
   {
     key: 'proactivity',
     label: 'Initiative',
-    desc: 'How often should the agent suggest next steps?',
+    help: 'How often should the agent suggest next steps?',
     options: [
       { value: 'low', label: 'Low' },
       { value: 'medium', label: 'Balanced' },
@@ -168,14 +194,14 @@ const STYLE_FIELDS = [
   {
     key: 'format',
     label: 'Structure',
-    desc: 'How should longer answers be organized?',
+    help: 'How should longer answers be organized?',
     options: [
       { value: 'bullets', label: 'Bullets' },
       { value: 'paragraphs', label: 'Paragraphs' },
       { value: 'mixed', label: 'Mixed' },
     ],
   },
-] as const;
+];
 
 export default function Home() {
   const [userId, setUserId] = useState(() => getUrlParam('id') || getUrlParam('userId') || '');
@@ -186,7 +212,7 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [granolaKey, setGranolaKey] = useState('');
   const [granolaSaved, setGranolaSaved] = useState(false);
-  const [profile, setProfile] = useState({
+  const [profile, setProfile] = useState<Record<ProfileKey, string>>({
     role: '',
     team: '',
     timezone: 'America/Los_Angeles',
@@ -201,33 +227,27 @@ export default function Home() {
     emoji: true,
   });
 
-  const currentStepIndex = STEPS.findIndex((item) => item.key === step);
-  const currentStep = STEPS[currentStepIndex];
-  const completedCount = useMemo(() => {
-    let count = currentStepIndex;
-    if (step === 'done') count = STEPS.length;
-    return Math.max(0, count);
-  }, [currentStepIndex, step]);
-  const progress = Math.round((completedCount / (STEPS.length - 1)) * 100);
+  const currentIndex = STEPS.findIndex((item) => item.key === step);
+  const currentStep = STEPS[currentIndex];
+  const progress = useMemo(() => {
+    if (step === 'done') return 100;
+    return Math.round((currentIndex / (STEPS.length - 1)) * 100);
+  }, [currentIndex, step]);
 
-  const goTo = useCallback((nextStep: StepKey) => {
-    setStep(nextStep);
+  const goTo = useCallback((next: StepKey) => {
+    setStep(next);
     setMessage('');
   }, []);
 
   const nextStep = useCallback(() => {
-    const currentIdx = STEPS.findIndex((item) => item.key === step);
-    if (currentIdx < STEPS.length - 1) {
-      goTo(STEPS[currentIdx + 1].key);
-    }
-  }, [goTo, step]);
+    const next = STEPS[currentIndex + 1];
+    if (next) goTo(next.key);
+  }, [currentIndex, goTo]);
 
   const prevStep = useCallback(() => {
-    const currentIdx = STEPS.findIndex((item) => item.key === step);
-    if (currentIdx > 0) {
-      goTo(STEPS[currentIdx - 1].key);
-    }
-  }, [goTo, step]);
+    const prev = STEPS[currentIndex - 1];
+    if (prev) goTo(prev.key);
+  }, [currentIndex, goTo]);
 
   useEffect(() => {
     const handler = (event: MessageEvent) => {
@@ -236,13 +256,26 @@ export default function Home() {
         setMessage(`${event.data.service} connected.`);
       }
     };
+
     window.addEventListener('message', handler);
     return () => window.removeEventListener('message', handler);
   }, []);
 
+  const serviceConnected = (service: ServiceName) => {
+    if (service === 'granola') return granolaSaved || services.granola;
+    return !!services[service];
+  };
+
+  const canOpenStep = (index: number) => {
+    if (index <= currentIndex) return true;
+    if (STEPS[index].key === 'done') return step === 'done';
+    if (!userId && STEPS[index].key !== 'slack') return false;
+    return true;
+  };
+
   const connectOAuth = (service: ServiceName) => {
     if (!userId) {
-      setMessage('Add your Slack User ID first so this connection can be saved to your profile.');
+      setMessage('Add your Slack identity first so this connection can be saved to the right profile.');
       goTo('slack');
       return;
     }
@@ -254,17 +287,17 @@ export default function Home() {
     );
 
     if (!popup) {
-      setMessage('Please allow popups for this site, then try the connection again.');
+      setMessage('Please allow popups for this site, then try again.');
       return;
     }
 
-    setMessage(`A ${SERVICE_COPY[service].label} approval window opened.`);
+    setMessage(`${SERVICES[service].label} approval opened.`);
   };
 
   const saveGranolaKey = async () => {
     if (!granolaKey.trim()) return;
     if (!userId) {
-      setMessage('Add your Slack User ID first so the Granola key is saved to the right profile.');
+      setMessage('Add your Slack identity first so the Granola key is saved to the right profile.');
       goTo('slack');
       return;
     }
@@ -284,7 +317,7 @@ export default function Home() {
       setServices((existing) => ({ ...existing, granola: true }));
       setMessage('Granola key saved.');
     } catch {
-      setMessage('Granola key could not be saved. You can skip it and connect later.');
+      setMessage('Granola key could not be saved. You can skip this and connect later.');
     }
     setLoading(false);
   };
@@ -306,417 +339,390 @@ export default function Home() {
       });
       setMessage('Profile saved.');
     } catch {
-      setMessage('Setup saved locally. The profile webhook did not respond.');
+      setMessage('Profile save did not return successfully. Your local choices are still shown here.');
     }
     setLoading(false);
     goTo('done');
   };
 
-  const canOpenStep = (targetIndex: number) => {
-    if (targetIndex <= currentStepIndex) return true;
-    if (STEPS[targetIndex].key === 'done') return step === 'done';
-    if (STEPS[targetIndex].key !== 'slack' && !userId) return false;
-    return true;
-  };
+  const renderWelcome = () => (
+    <div className="stack">
+      <div className="overview-grid">
+        {[
+          {
+            label: 'Identity',
+            title: 'Start with Slack',
+            body: 'The agent needs a Slack member ID before it can save service connections and preferences.',
+          },
+          {
+            label: 'Context',
+            title: 'Connect what matters',
+            body: 'Google, GitHub, and Granola are optional but make the agent more aware of your work.',
+          },
+          {
+            label: 'Behavior',
+            title: 'Tune the defaults',
+            body: 'Set role context and response style once, then adjust later as the agent learns your workflow.',
+          },
+        ].map((item) => (
+          <article key={item.label} className="intro-tile">
+            <span>{item.label}</span>
+            <h3>{item.title}</h3>
+            <p>{item.body}</p>
+          </article>
+        ))}
+      </div>
 
-  const statusForService = (service: ServiceName) => {
-    if (service === 'granola') return granolaSaved || services.granola;
-    return services[service];
-  };
-
-  const renderServiceStep = (service: ServiceName) => {
-    const copy = SERVICE_COPY[service];
-    const connected = statusForService(service);
-
-    return (
-      <div className="section-stack">
-        <div className="decision-panel">
-          <div>
-            <p className="panel-kicker">What this unlocks</p>
-            <h3>{copy.label} context</h3>
+      <div className="timeline">
+        {STEPS.slice(1, -1).map((item, index) => (
+          <div key={item.key} className="timeline-item">
+            <span>{index + 1}</span>
+            <div>
+              <strong>{item.label}</strong>
+              <small>{item.eyebrow}</small>
+            </div>
           </div>
-          <ul className="check-list">
-            {copy.gains.map((gain) => (
-              <li key={gain}>{gain}</li>
-            ))}
-          </ul>
-          <p className="fine-print">{copy.note}</p>
+        ))}
+      </div>
+    </div>
+  );
+
+  const renderSlack = () => (
+    <div className="stack">
+      <section className="setup-section">
+        <div className="section-heading">
+          <span>Required first</span>
+          <h2>Slack is the account anchor</h2>
+          <p>Use Slack sign-in when possible. If you already have your member ID, paste it directly.</p>
         </div>
 
-        {connected ? (
-          <div className="state-row success">
-            <span className="state-dot" />
-            <span>{copy.label} is connected.</span>
-          </div>
-        ) : service === 'granola' ? (
-          <div className="form-block">
-            <label className="field-label" htmlFor="granola-key">
-              Granola API key
-            </label>
-            <input
-              id="granola-key"
-              type="password"
-              placeholder="Paste your Granola API key"
-              value={granolaKey}
-              onChange={(event) => setGranolaKey(event.target.value)}
-              className="text-input"
-            />
-            <p className="field-hint">Find it in Granola Settings, then API.</p>
-            <button
-              onClick={saveGranolaKey}
-              disabled={!granolaKey.trim() || loading}
-              className="btn-secondary"
+        {!userId ? (
+          <div className="identity-grid">
+            <a
+              href={`https://slack.com/openid/connect/authorize?response_type=code&client_id=879184060177.11209135000535&scope=openid,profile,email&redirect_uri=${encodeURIComponent(
+                'https://disco-agent-portal.vercel.app/api/oauth/slack'
+              )}`}
+              className="choice-card"
             >
-              {loading ? 'Saving...' : copy.connectLabel}
-            </button>
+              <span className="choice-icon">S</span>
+              <span>
+                <strong>Sign in with Slack</strong>
+                <small>Recommended path</small>
+              </span>
+              <em>Open</em>
+            </a>
+
+            <div className="manual-card">
+              <label htmlFor="slack-id">Slack member ID</label>
+              <input
+                id="slack-id"
+                value={userId}
+                onChange={(event) => setUserId(event.target.value.trim())}
+                placeholder="Example: URTU2JQCT"
+                className="text-input"
+              />
+              <p>Find it in Slack profile, more menu, Copy member ID.</p>
+            </div>
           </div>
         ) : (
-          <button onClick={() => connectOAuth(service)} className="connect-button">
-            <span>{copy.connectLabel}</span>
-            <span className="button-detail">Opens secure approval</span>
-          </button>
+          <div className="connected-banner">
+            <span />
+            <div>
+              <strong>Slack identity saved</strong>
+              <p>{userId}</p>
+            </div>
+          </div>
         )}
+      </section>
+    </div>
+  );
 
-        <div className="choice-row">
-          <button onClick={prevStep} className="btn-quiet">
-            Back
-          </button>
-          <div className="choice-actions">
-            {!connected && (
-              <button onClick={nextStep} className="btn-text">
-                Skip for now
+  const renderService = (service: ServiceName) => {
+    const config = SERVICES[service];
+    const connected = serviceConnected(service);
+
+    return (
+      <div className="stack">
+        <section className="setup-section">
+          <div className="section-heading">
+            <span>{connected ? 'Connected' : 'Connection'}</span>
+            <h2>{config.label}</h2>
+            <p>{config.short}</p>
+          </div>
+
+          <div className="integration-row">
+            <div className="integration-mark">{config.label.slice(0, 1)}</div>
+            <div>
+              <strong>{config.label}</strong>
+              <p>{connected ? 'This source is ready for the agent.' : config.permission}</p>
+            </div>
+            {connected ? (
+              <span className="status-pill connected">Connected</span>
+            ) : service === 'granola' ? (
+              <span className="status-pill">API key</span>
+            ) : (
+              <button className="button secondary compact" onClick={() => connectOAuth(service)}>
+                Connect
               </button>
             )}
-            <button onClick={nextStep} className="btn-primary">
-              Continue
-            </button>
           </div>
-        </div>
+
+          {service === 'granola' && !connected && (
+            <div className="key-row">
+              <input
+                type="password"
+                value={granolaKey}
+                onChange={(event) => setGranolaKey(event.target.value)}
+                placeholder="Paste Granola API key"
+                className="text-input"
+              />
+              <button
+                className="button secondary"
+                onClick={saveGranolaKey}
+                disabled={!granolaKey.trim() || loading}
+              >
+                {loading ? 'Saving...' : 'Save key'}
+              </button>
+            </div>
+          )}
+        </section>
+
+        <section className="setup-section">
+          <div className="section-heading compact-heading">
+            <span>What this unlocks</span>
+          </div>
+          <ul className="benefit-list">
+            {config.benefits.map((benefit) => (
+              <li key={benefit}>{benefit}</li>
+            ))}
+          </ul>
+        </section>
       </div>
     );
   };
 
+  const renderProfile = () => (
+    <div className="stack">
+      <section className="setup-section">
+        <div className="section-heading">
+          <span>Profile</span>
+          <h2>Teach the agent your working context</h2>
+          <p>Short, plain answers are enough. The agent uses these as defaults, not as permanent rules.</p>
+        </div>
+        <div className="field-grid">
+          {PROFILE_FIELDS.map((field) => (
+            <label key={field.key} className="field">
+              <span>{field.label}</span>
+              <input
+                value={profile[field.key]}
+                onChange={(event) => setProfile({ ...profile, [field.key]: event.target.value })}
+                placeholder={field.placeholder}
+                className="text-input"
+              />
+              <small>{field.help}</small>
+            </label>
+          ))}
+        </div>
+      </section>
+    </div>
+  );
+
+  const renderStyle = () => (
+    <div className="stack">
+      <section className="setup-section">
+        <div className="section-heading">
+          <span>Behavior</span>
+          <h2>Set the default response style</h2>
+          <p>These controls are intentionally simple: depth, initiative, structure, and a light tone preference.</p>
+        </div>
+
+        <div className="preference-list">
+          {STYLE_FIELDS.map((field) => (
+            <div key={field.key} className="preference-row">
+              <div>
+                <strong>{field.label}</strong>
+                <p>{field.help}</p>
+              </div>
+              <div className="segmented">
+                {field.options.map((option) => (
+                  <button
+                    key={option.value}
+                    className={style[field.key] === option.value ? 'active' : ''}
+                    onClick={() => setStyle({ ...style, [field.key]: option.value })}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+
+          <label className="switch-row">
+            <input
+              type="checkbox"
+              checked={style.emoji}
+              onChange={(event) => setStyle({ ...style, emoji: event.target.checked })}
+            />
+            <span className="switch-track">
+              <span />
+            </span>
+            <div>
+              <strong>Allow emoji when it fits</strong>
+              <p>Keep it subtle; useful for warmth, not decoration.</p>
+            </div>
+          </label>
+        </div>
+      </section>
+    </div>
+  );
+
+  const renderDone = () => (
+    <div className="stack">
+      <section className="setup-section">
+        <div className="section-heading">
+          <span>Summary</span>
+          <h2>Ready to use in Slack</h2>
+          <p>Here is what the agent knows before the first conversation.</p>
+        </div>
+
+        <div className="summary-list">
+          <SummaryRow label="Slack" value={userId || 'Not set'} />
+          <SummaryRow label="Google" value={serviceConnected('google') ? 'Connected' : 'Skipped'} />
+          <SummaryRow label="GitHub" value={serviceConnected('github') ? 'Connected' : 'Skipped'} />
+          <SummaryRow label="Granola" value={serviceConnected('granola') ? 'Connected' : 'Skipped'} />
+          <SummaryRow label="Role" value={profile.role || 'Not set'} />
+          <SummaryRow label="Style" value={`${style.verbosity} / ${style.proactivity} / ${style.format}`} />
+        </div>
+      </section>
+
+      <section className="setup-section action-panel">
+        <div>
+          <span>Next</span>
+          <h2>DM @gruv in Slack</h2>
+          <p>Ask for a briefing, a PR summary, meeting follow-ups, or help finding what needs attention.</p>
+        </div>
+        <a href={`/?id=${userId}`} className="return-link">
+          Bookmark setup link
+        </a>
+      </section>
+    </div>
+  );
+
   const renderStep = () => {
     switch (step) {
       case 'welcome':
-        return (
-          <div className="section-stack">
-            <div className="intro-grid">
-              <div>
-                <p className="panel-kicker">Setup path</p>
-                <h3>What you are building</h3>
-                <p>
-                  A personal agent profile that ties together your identity, connected tools,
-                  priorities, and communication preferences.
-                </p>
-              </div>
-              <div>
-                <p className="panel-kicker">Time needed</p>
-                <h3>About five minutes</h3>
-                <p>
-                  Slack is required. Google, GitHub, and Granola can be connected now or skipped
-                  until you are ready.
-                </p>
-              </div>
-            </div>
-            <div className="flow-preview">
-              {STEPS.slice(1, -1).map((item) => (
-                <div key={item.key} className="flow-item">
-                  <span>{item.label}</span>
-                  <small>{item.eyebrow}</small>
-                </div>
-              ))}
-            </div>
-            <div className="choice-row">
-              <span className="microcopy">You can change these settings later.</span>
-              <button onClick={() => goTo('slack')} className="btn-primary">
-                Begin setup
-              </button>
-            </div>
-          </div>
-        );
-
+        return renderWelcome();
       case 'slack':
-        return (
-          <div className="section-stack">
-            <div className="decision-panel">
-              <div>
-                <p className="panel-kicker">Required first</p>
-                <h3>Slack is the account anchor</h3>
-              </div>
-              <p>
-                Every connection in this setup is saved against your Slack identity. The agent uses
-                it to know when a message, briefing, or saved preference belongs to you.
-              </p>
-            </div>
-
-            {!userId ? (
-              <div className="identity-options">
-                <a
-                  href={`https://slack.com/openid/connect/authorize?response_type=code&client_id=879184060177.11209135000535&scope=openid,profile,email&redirect_uri=${encodeURIComponent(
-                    'https://disco-agent-portal.vercel.app/api/oauth/slack'
-                  )}`}
-                  className="connect-button"
-                >
-                  <span>Sign in with Slack</span>
-                  <span className="button-detail">Recommended</span>
-                </a>
-                <div className="manual-entry">
-                  <label className="field-label" htmlFor="slack-id">
-                    Or enter Slack member ID
-                  </label>
-                  <input
-                    id="slack-id"
-                    placeholder="Example: URTU2JQCT"
-                    onChange={(event) => setUserId(event.target.value.trim())}
-                    className="text-input"
-                  />
-                  <p className="field-hint">Slack profile, more menu, Copy member ID.</p>
-                </div>
-              </div>
-            ) : (
-              <div className="state-row success">
-                <span className="state-dot" />
-                <span>
-                  Slack identity saved as <strong>{userId}</strong>.
-                </span>
-              </div>
-            )}
-
-            <div className="choice-row">
-              <button onClick={prevStep} className="btn-quiet">
-                Back
-              </button>
-              <button onClick={nextStep} disabled={!userId} className="btn-primary">
-                Continue
-              </button>
-            </div>
-          </div>
-        );
-
+        return renderSlack();
       case 'google':
-        return renderServiceStep('google');
-
+        return renderService('google');
       case 'github':
-        return renderServiceStep('github');
-
+        return renderService('github');
       case 'granola':
-        return renderServiceStep('granola');
-
+        return renderService('granola');
       case 'profile':
-        return (
-          <div className="section-stack">
-            <div className="decision-panel">
-              <div>
-                <p className="panel-kicker">Personal context</p>
-                <h3>Help the agent filter what matters</h3>
-              </div>
-              <p>
-                These answers become defaults for prioritization, reminders, summaries, and the
-                way the agent frames recommendations.
-              </p>
-            </div>
-            <div className="profile-grid">
-              {PROFILE_FIELDS.map((field) => (
-                <div key={field.key} className="field">
-                  <label className="field-label" htmlFor={field.key}>
-                    {field.label}
-                  </label>
-                  <input
-                    id={field.key}
-                    value={profile[field.key]}
-                    onChange={(event) =>
-                      setProfile({ ...profile, [field.key]: event.target.value })
-                    }
-                    placeholder={field.placeholder}
-                    className="text-input"
-                  />
-                  <p className="field-hint">{field.hint}</p>
-                </div>
-              ))}
-            </div>
-            <div className="choice-row">
-              <button onClick={prevStep} className="btn-quiet">
-                Back
-              </button>
-              <button onClick={nextStep} className="btn-primary">
-                Continue
-              </button>
-            </div>
-          </div>
-        );
-
+        return renderProfile();
       case 'style':
-        return (
-          <div className="section-stack">
-            <div className="decision-panel">
-              <div>
-                <p className="panel-kicker">Agent behavior</p>
-                <h3>Set the default working style</h3>
-              </div>
-              <p>
-                These preferences shape day-to-day answers. They are intentionally practical:
-                depth, initiative, structure, and tone.
-              </p>
-            </div>
-            <div className="preference-stack">
-              {STYLE_FIELDS.map((field) => (
-                <div key={field.key} className="preference-row">
-                  <div>
-                    <label className="field-label">{field.label}</label>
-                    <p className="field-hint">{field.desc}</p>
-                  </div>
-                  <div className="segmented-control">
-                    {field.options.map((option) => (
-                      <button
-                        key={option.value}
-                        onClick={() => setStyle({ ...style, [field.key]: option.value })}
-                        className={style[field.key] === option.value ? 'selected' : ''}
-                      >
-                        {option.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ))}
-              <label className="toggle-row">
-                <input
-                  type="checkbox"
-                  checked={style.emoji}
-                  onChange={(event) => setStyle({ ...style, emoji: event.target.checked })}
-                />
-                <span className="toggle-track">
-                  <span className="toggle-thumb" />
-                </span>
-                <span>
-                  <strong>Allow emoji</strong>
-                  <small>Use sparingly when it fits the conversation.</small>
-                </span>
-              </label>
-            </div>
-            <div className="choice-row">
-              <button onClick={prevStep} className="btn-quiet">
-                Back
-              </button>
-              <button onClick={submitOnboarding} className="btn-primary">
-                {loading ? 'Saving...' : 'Finish setup'}
-              </button>
-            </div>
-          </div>
-        );
-
+        return renderStyle();
       case 'done':
-        return (
-          <div className="section-stack">
-            <div className="summary-grid">
-              <div className="summary-block">
-                <p className="panel-kicker">Profile</p>
-                <h3>{profile.role || 'Role not set'}</h3>
-                <p>{profile.team || 'No team added'} / {profile.timezone}</p>
-              </div>
-              <div className="summary-block">
-                <p className="panel-kicker">Style</p>
-                <h3>{style.verbosity} / {style.proactivity}</h3>
-                <p>{style.format} format / emoji {style.emoji ? 'allowed' : 'off'}</p>
-              </div>
-            </div>
-            <div className="connection-summary">
-              {(['google', 'github', 'granola'] as ServiceName[]).map((service) => (
-                <div key={service} className="summary-row">
-                  <span>{SERVICE_COPY[service].label}</span>
-                  <strong>{statusForService(service) ? 'Connected' : 'Skipped'}</strong>
-                </div>
-              ))}
-              <div className="summary-row">
-                <span>Slack</span>
-                <strong>{userId}</strong>
-              </div>
-            </div>
-            <div className="decision-panel">
-              <div>
-                <p className="panel-kicker">Start using it</p>
-                <h3>Open Slack and DM @gruv</h3>
-              </div>
-              <p>
-                Ask for a briefing, request help with a PR, or have it summarize what needs your
-                attention today. Bookmark this setup link if you want to adjust preferences later.
-              </p>
-              <a href={`/?id=${userId}`} className="bookmark-link">
-                disco-agent-portal.vercel.app/?id={userId}
-              </a>
-            </div>
-            <div className="choice-row">
-              <button onClick={prevStep} className="btn-quiet">
-                Back
-              </button>
-              <button onClick={() => goTo('welcome')} className="btn-secondary">
-                Review setup
-              </button>
-            </div>
-          </div>
-        );
-
+        return renderDone();
       default:
         return null;
     }
   };
 
+  const primaryAction = () => {
+    if (step === 'style') return submitOnboarding;
+    if (step === 'done') return () => goTo('welcome');
+    return nextStep;
+  };
+
+  const primaryLabel = () => {
+    if (step === 'welcome') return 'Begin setup';
+    if (step === 'style') return loading ? 'Saving...' : 'Finish setup';
+    if (step === 'done') return 'Review setup';
+    return 'Continue';
+  };
+
+  const primaryDisabled = step === 'slack' && !userId;
+  const showSkip =
+    (step === 'google' && !serviceConnected('google')) ||
+    (step === 'github' && !serviceConnected('github')) ||
+    (step === 'granola' && !serviceConnected('granola'));
+
   return (
     <>
-      <div className="app-shell">
-        <header className="topbar">
-          <div>
-            <p className="product-kicker">Disco Agent Portal</p>
-            <span>Agent onboarding</span>
+      <div className="app">
+        <aside className="rail">
+          <div className="brand">
+            <div className="brand-mark">D</div>
+            <div>
+              <strong>Disco Agent</strong>
+              <span>Onboarding</span>
+            </div>
           </div>
-          {userId && <div className="user-chip">{userId}</div>}
-        </header>
 
-        <main className="setup-layout">
-          <aside className="setup-rail" aria-label="Setup progress">
-            <div className="progress-card">
-              <div className="progress-copy">
-                <span>Setup progress</span>
-                <strong>{progress}%</strong>
-              </div>
-              <div className="progress-track">
-                <span style={{ width: `${progress}%` }} />
-              </div>
+          <div className="progress-block">
+            <div>
+              <span>Setup</span>
+              <strong>{progress}%</strong>
             </div>
-
-            <ol className="step-list">
-              {STEPS.map((item, index) => {
-                const isCurrent = item.key === step;
-                const isComplete = index < currentStepIndex || step === 'done';
-                const isLocked = !canOpenStep(index);
-
-                return (
-                  <li key={item.key}>
-                    <button
-                      onClick={() => !isLocked && goTo(item.key)}
-                      disabled={isLocked}
-                      className={`${isCurrent ? 'current' : ''} ${isComplete ? 'complete' : ''}`}
-                    >
-                      <span className="step-marker">{isComplete ? 'OK' : index + 1}</span>
-                      <span>
-                        <strong>{item.label}</strong>
-                        <small>{item.eyebrow}</small>
-                      </span>
-                    </button>
-                  </li>
-                );
-              })}
-            </ol>
-          </aside>
-
-          <section className="workspace">
-            {message && <div className="toast">{message}</div>}
-            <div className="step-header">
-              <p className="step-eyebrow">{currentStep.eyebrow}</p>
-              <h1>{currentStep.title}</h1>
-              <p>{currentStep.summary}</p>
+            <div className="progress-track">
+              <span style={{ width: `${progress}%` }} />
             </div>
-            <div className="explain-strip">
+          </div>
+
+          <nav className="step-nav" aria-label="Setup steps">
+            {STEPS.map((item, index) => {
+              const active = item.key === step;
+              const complete = index < currentIndex || step === 'done';
+              const locked = !canOpenStep(index);
+
+              return (
+                <button
+                  key={item.key}
+                  disabled={locked}
+                  onClick={() => !locked && goTo(item.key)}
+                  className={`${active ? 'active' : ''} ${complete ? 'complete' : ''}`}
+                >
+                  <span className="step-dot">{complete ? 'OK' : index + 1}</span>
+                  <span>
+                    <strong>{item.label}</strong>
+                    <small>{item.eyebrow}</small>
+                  </span>
+                </button>
+              );
+            })}
+          </nav>
+
+          <div className="rail-footer">
+            <span>Need help?</span>
+            <a href="mailto:support@disco.co">Contact support</a>
+          </div>
+        </aside>
+
+        <main className="main">
+          <header className="topbar">
+            <div>
+              <span>{currentStep.eyebrow}</span>
+              <strong>{currentStep.label}</strong>
+            </div>
+            {userId && <div className="user-chip">{userId}</div>}
+          </header>
+
+          {message && <div className="toast">{message}</div>}
+
+          <div className="content-grid">
+            <section className="primary-pane">
+              <div className="hero-copy">
+                <span>{currentStep.eyebrow}</span>
+                <h1>{currentStep.title}</h1>
+                <p>{currentStep.summary}</p>
+              </div>
+              {renderStep()}
+            </section>
+
+            <aside className="brief">
               <div>
                 <span>Why this matters</span>
                 <p>{currentStep.why}</p>
@@ -725,14 +731,41 @@ export default function Home() {
                 <span>Outcome</span>
                 <p>{currentStep.outcome}</p>
               </div>
+              <div>
+                <span>Connections</span>
+                <ConnectionLine label="Google" connected={serviceConnected('google')} />
+                <ConnectionLine label="GitHub" connected={serviceConnected('github')} />
+                <ConnectionLine label="Granola" connected={serviceConnected('granola')} />
+              </div>
+            </aside>
+          </div>
+
+          <footer className="action-bar">
+            {currentIndex > 0 ? (
+              <button className="button ghost" onClick={prevStep}>
+                Back
+              </button>
+            ) : (
+              <span />
+            )}
+            <div>
+              {showSkip && (
+                <button className="button ghost" onClick={nextStep}>
+                  Skip for now
+                </button>
+              )}
+              <button className="button primary" onClick={primaryAction()} disabled={primaryDisabled || loading}>
+                {primaryLabel()}
+              </button>
             </div>
-            {renderStep()}
-          </section>
+          </footer>
         </main>
       </div>
 
-      <style jsx global>{`
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
 
         * {
           box-sizing: border-box;
@@ -746,10 +779,10 @@ export default function Home() {
 
         body {
           margin: 0;
+          background: #f7f8fb;
+          color: #111827;
           font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-          background: #f4f2ee;
-          color: #20211f;
-          font-size: 15px;
+          font-size: 14px;
           line-height: 1.5;
           -webkit-font-smoothing: antialiased;
           -moz-osx-font-smoothing: grayscale;
@@ -759,544 +792,698 @@ export default function Home() {
         input {
           font: inherit;
         }
-      `}</style>
+      `,
+        }}
+      />
 
-      <style jsx>{`
-        .app-shell {
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `
+        .app {
           min-height: 100vh;
-          padding: 28px;
+          display: grid;
+          grid-template-columns: 280px minmax(0, 1fr);
+        }
+
+        .rail {
+          position: sticky;
+          top: 0;
+          height: 100vh;
+          display: flex;
+          flex-direction: column;
+          border-right: 1px solid #e5e7eb;
+          background: #ffffff;
+          padding: 22px 18px;
+        }
+
+        .brand {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          margin-bottom: 28px;
+        }
+
+        .brand-mark {
+          width: 36px;
+          height: 36px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 10px;
+          background: #2563eb;
+          color: #ffffff;
+          font-weight: 900;
+        }
+
+        .brand strong,
+        .brand span {
+          display: block;
+        }
+
+        .brand strong {
+          font-size: 15px;
+        }
+
+        .brand span {
+          color: #6b7280;
+          font-size: 12px;
+        }
+
+        .progress-block {
+          border: 1px solid #e5e7eb;
+          border-radius: 12px;
+          padding: 14px;
+          margin-bottom: 18px;
+          background: #f9fafb;
+        }
+
+        .progress-block > div:first-child {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 10px;
+          margin-bottom: 10px;
+          color: #6b7280;
+          font-size: 12px;
+          font-weight: 700;
+        }
+
+        .progress-block strong {
+          color: #111827;
+        }
+
+        .progress-track {
+          height: 6px;
+          overflow: hidden;
+          border-radius: 999px;
+          background: #e5e7eb;
+        }
+
+        .progress-track span {
+          display: block;
+          height: 100%;
+          border-radius: inherit;
+          background: #2563eb;
+          transition: width 180ms ease;
+        }
+
+        .step-nav {
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+        }
+
+        .step-nav button {
+          position: relative;
+          width: 100%;
+          display: grid;
+          grid-template-columns: 30px 1fr;
+          align-items: center;
+          gap: 10px;
+          border: 0;
+          border-radius: 10px;
+          background: transparent;
+          color: #6b7280;
+          cursor: pointer;
+          padding: 10px;
+          text-align: left;
+          transition: background 150ms ease, color 150ms ease;
+        }
+
+        .step-nav button:hover:not(:disabled),
+        .step-nav button.active {
+          background: #eff6ff;
+          color: #1d4ed8;
+        }
+
+        .step-nav button:disabled {
+          cursor: not-allowed;
+          opacity: 0.48;
+        }
+
+        .step-nav strong,
+        .step-nav small {
+          display: block;
+        }
+
+        .step-nav strong {
+          color: inherit;
+          font-size: 13px;
+          font-weight: 700;
+        }
+
+        .step-nav small {
+          color: #9ca3af;
+          font-size: 11px;
+          margin-top: 1px;
+        }
+
+        .step-dot {
+          width: 28px;
+          height: 28px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 999px;
+          background: #f3f4f6;
+          color: #6b7280;
+          font-size: 11px;
+          font-weight: 800;
+        }
+
+        .step-nav button.active .step-dot {
+          background: #2563eb;
+          color: #ffffff;
+        }
+
+        .step-nav button.complete .step-dot {
+          background: #059669;
+          color: #ffffff;
+          font-size: 10px;
+        }
+
+        .rail-footer {
+          margin-top: auto;
+          padding-top: 18px;
+          border-top: 1px solid #e5e7eb;
+        }
+
+        .rail-footer span,
+        .rail-footer a {
+          display: block;
+          font-size: 12px;
+        }
+
+        .rail-footer span {
+          color: #6b7280;
+          margin-bottom: 4px;
+        }
+
+        .rail-footer a {
+          color: #2563eb;
+          font-weight: 700;
+          text-decoration: none;
+        }
+
+        .main {
+          min-width: 0;
+          display: flex;
+          flex-direction: column;
+          min-height: 100vh;
         }
 
         .topbar {
-          max-width: 1180px;
-          margin: 0 auto 18px;
+          height: 64px;
           display: flex;
           align-items: center;
           justify-content: space-between;
           gap: 16px;
+          border-bottom: 1px solid #e5e7eb;
+          background: rgba(255, 255, 255, 0.86);
+          backdrop-filter: blur(14px);
+          padding: 0 32px;
         }
 
-        .topbar div:first-child {
-          display: flex;
-          flex-direction: column;
-          gap: 2px;
+        .topbar span,
+        .topbar strong {
+          display: block;
         }
 
-        .product-kicker,
-        .panel-kicker,
-        .step-eyebrow {
-          margin: 0;
-          color: #76736b;
+        .topbar span {
+          color: #6b7280;
           font-size: 11px;
           font-weight: 800;
           letter-spacing: 0.08em;
           text-transform: uppercase;
         }
 
-        .topbar span {
-          color: #20211f;
-          font-size: 18px;
-          font-weight: 800;
-        }
-
-        .user-chip {
-          border: 1px solid #d8d2c8;
-          background: #ffffff;
-          color: #4c4a45;
-          border-radius: 999px;
-          padding: 8px 12px;
-          font-size: 13px;
-          font-weight: 700;
-        }
-
-        .setup-layout {
-          max-width: 1180px;
-          margin: 0 auto;
-          display: grid;
-          grid-template-columns: minmax(240px, 300px) minmax(0, 1fr);
-          gap: 18px;
-          align-items: start;
-        }
-
-        .setup-rail,
-        .workspace {
-          background: #ffffff;
-          border: 1px solid #d8d2c8;
-          border-radius: 8px;
-          box-shadow: 0 18px 50px rgba(53, 47, 39, 0.08);
-        }
-
-        .setup-rail {
-          position: sticky;
-          top: 20px;
-          padding: 16px;
-        }
-
-        .workspace {
-          min-height: 680px;
-          padding: 34px;
-        }
-
-        .progress-card {
-          border-bottom: 1px solid #ebe6df;
-          padding-bottom: 16px;
-          margin-bottom: 14px;
-        }
-
-        .progress-copy {
-          display: flex;
-          justify-content: space-between;
-          color: #5c5850;
-          font-size: 13px;
-          margin-bottom: 10px;
-        }
-
-        .progress-copy strong {
-          color: #20211f;
-        }
-
-        .progress-track {
-          height: 8px;
-          background: #ece7de;
-          border-radius: 999px;
-          overflow: hidden;
-        }
-
-        .progress-track span {
-          display: block;
-          height: 100%;
-          background: #246b5f;
-          border-radius: inherit;
-          transition: width 180ms ease;
-        }
-
-        .step-list {
-          list-style: none;
-          display: flex;
-          flex-direction: column;
-          gap: 4px;
-          margin: 0;
-          padding: 0;
-        }
-
-        .step-list button {
-          width: 100%;
-          display: grid;
-          grid-template-columns: 30px 1fr;
-          gap: 10px;
-          align-items: center;
-          border: 0;
-          background: transparent;
-          color: #5c5850;
-          text-align: left;
-          border-radius: 6px;
-          padding: 10px;
-          cursor: pointer;
-        }
-
-        .step-list button:hover:not(:disabled),
-        .step-list button.current {
-          background: #f3f0ea;
-          color: #20211f;
-        }
-
-        .step-list button:disabled {
-          cursor: not-allowed;
-          opacity: 0.45;
-        }
-
-        .step-marker {
-          width: 28px;
-          height: 28px;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          border-radius: 50%;
-          border: 1px solid #d8d2c8;
-          background: #ffffff;
-          color: #76736b;
-          font-size: 12px;
-          font-weight: 800;
-        }
-
-        .step-list button.current .step-marker,
-        .step-list button.complete .step-marker {
-          background: #246b5f;
-          border-color: #246b5f;
-          color: #ffffff;
-        }
-
-        .step-list strong,
-        .step-list small {
-          display: block;
-        }
-
-        .step-list strong {
+        .topbar strong {
+          color: #111827;
           font-size: 14px;
         }
 
-        .step-list small {
-          color: #8b877e;
+        .user-chip {
+          border: 1px solid #e5e7eb;
+          border-radius: 999px;
+          background: #ffffff;
+          color: #374151;
+          padding: 7px 11px;
           font-size: 12px;
-          margin-top: 1px;
+          font-weight: 700;
         }
 
         .toast {
-          border: 1px solid #b9d3cc;
-          background: #eef8f5;
-          color: #285a50;
-          border-radius: 6px;
+          margin: 24px 32px 0;
+          border: 1px solid #bfdbfe;
+          border-radius: 10px;
+          background: #eff6ff;
+          color: #1d4ed8;
           padding: 10px 12px;
-          margin-bottom: 18px;
           font-size: 13px;
           font-weight: 700;
         }
 
-        .step-header {
-          max-width: 740px;
-          margin-bottom: 22px;
-        }
-
-        .step-header h1 {
-          margin: 8px 0 12px;
-          color: #20211f;
-          font-size: 42px;
-          line-height: 1.04;
-          letter-spacing: 0;
-        }
-
-        .step-header p:last-child {
-          margin: 0;
-          color: #5c5850;
-          font-size: 17px;
-          max-width: 680px;
-        }
-
-        .explain-strip {
+        .content-grid {
+          width: 100%;
+          max-width: 1120px;
+          margin: 0 auto;
+          padding: 42px 32px 28px;
           display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 1px;
-          overflow: hidden;
-          border: 1px solid #e3ddd3;
-          border-radius: 8px;
-          background: #e3ddd3;
+          grid-template-columns: minmax(0, 1fr) 300px;
+          gap: 28px;
+          align-items: start;
+        }
+
+        .primary-pane {
+          min-width: 0;
+        }
+
+        .hero-copy {
           margin-bottom: 28px;
         }
 
-        .explain-strip div {
-          background: #fbfaf8;
-          padding: 18px;
-        }
-
-        .explain-strip span {
-          color: #76736b;
+        .hero-copy span,
+        .section-heading span,
+        .brief span,
+        .action-panel span {
+          color: #2563eb;
           display: block;
-          font-size: 12px;
-          font-weight: 800;
-          margin-bottom: 6px;
+          font-size: 11px;
+          font-weight: 900;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
         }
 
-        .explain-strip p {
+        .hero-copy h1 {
+          margin: 8px 0 12px;
+          max-width: 720px;
+          color: #111827;
+          font-size: 44px;
+          line-height: 1.03;
+          letter-spacing: 0;
+        }
+
+        .hero-copy p {
           margin: 0;
-          color: #4c4a45;
+          max-width: 680px;
+          color: #4b5563;
+          font-size: 17px;
         }
 
-        .section-stack {
+        .stack {
           display: flex;
           flex-direction: column;
-          gap: 18px;
+          gap: 16px;
         }
 
-        .intro-grid,
-        .summary-grid {
+        .overview-grid {
           display: grid;
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-          gap: 14px;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 12px;
         }
 
-        .intro-grid > div,
-        .summary-block,
-        .decision-panel,
-        .form-block,
-        .connection-summary {
-          border: 1px solid #e3ddd3;
-          border-radius: 8px;
-          background: #fbfaf8;
+        .intro-tile,
+        .setup-section,
+        .brief {
+          border: 1px solid #e5e7eb;
+          border-radius: 14px;
+          background: #ffffff;
+          box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+        }
+
+        .intro-tile {
           padding: 18px;
         }
 
-        .intro-grid h3,
-        .summary-block h3,
-        .decision-panel h3 {
-          margin: 6px 0 8px;
-          color: #20211f;
-          font-size: 18px;
-        }
-
-        .intro-grid p,
-        .summary-block p,
-        .decision-panel p,
-        .fine-print {
-          margin: 0;
-          color: #5c5850;
-        }
-
-        .flow-preview {
-          display: grid;
-          grid-template-columns: repeat(3, minmax(0, 1fr));
-          gap: 10px;
-        }
-
-        .flow-item {
-          border-left: 3px solid #246b5f;
-          background: #f5f2ec;
-          border-radius: 6px;
-          padding: 12px;
-        }
-
-        .flow-item span,
-        .flow-item small {
+        .intro-tile span {
+          color: #6b7280;
           display: block;
-        }
-
-        .flow-item span {
-          color: #20211f;
+          font-size: 11px;
           font-weight: 800;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+          margin-bottom: 10px;
         }
 
-        .flow-item small {
-          color: #76736b;
-          margin-top: 2px;
+        .intro-tile h3 {
+          margin: 0 0 8px;
+          color: #111827;
+          font-size: 16px;
         }
 
-        .decision-panel {
-          display: grid;
-          gap: 14px;
-        }
-
-        .check-list {
+        .intro-tile p,
+        .section-heading p,
+        .integration-row p,
+        .manual-card p,
+        .preference-row p,
+        .switch-row p,
+        .brief p,
+        .action-panel p {
           margin: 0;
-          padding: 0;
-          list-style: none;
+          color: #6b7280;
+        }
+
+        .timeline {
           display: grid;
           gap: 8px;
         }
 
-        .check-list li {
-          position: relative;
-          color: #4c4a45;
-          padding-left: 24px;
+        .timeline-item {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          border: 1px solid #e5e7eb;
+          border-radius: 12px;
+          background: #ffffff;
+          padding: 12px 14px;
         }
 
-        .check-list li::before {
+        .timeline-item > span {
+          width: 28px;
+          height: 28px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 999px;
+          background: #eff6ff;
+          color: #2563eb;
+          font-size: 12px;
+          font-weight: 900;
+        }
+
+        .timeline-item strong,
+        .timeline-item small {
+          display: block;
+        }
+
+        .timeline-item small {
+          color: #6b7280;
+          font-size: 12px;
+        }
+
+        .setup-section {
+          padding: 22px;
+        }
+
+        .section-heading {
+          margin-bottom: 18px;
+        }
+
+        .section-heading h2,
+        .action-panel h2 {
+          margin: 6px 0 8px;
+          color: #111827;
+          font-size: 20px;
+          line-height: 1.2;
+        }
+
+        .compact-heading {
+          margin-bottom: 12px;
+        }
+
+        .identity-grid {
+          display: grid;
+          grid-template-columns: 1fr;
+          gap: 12px;
+        }
+
+        .choice-card {
+          display: flex;
+          align-items: center;
+          gap: 14px;
+          border: 1px solid #e5e7eb;
+          border-radius: 12px;
+          background: #f9fafb;
+          color: #111827;
+          padding: 14px;
+          text-decoration: none;
+          transition: border 150ms ease, background 150ms ease;
+        }
+
+        .choice-card:hover {
+          border-color: #93c5fd;
+          background: #eff6ff;
+        }
+
+        .choice-card strong,
+        .choice-card small {
+          display: block;
+        }
+
+        .choice-card small,
+        .choice-card em {
+          color: #6b7280;
+          font-size: 12px;
+          font-style: normal;
+        }
+
+        .choice-card em {
+          margin-left: auto;
+          color: #2563eb;
+          font-weight: 800;
+        }
+
+        .choice-icon,
+        .integration-mark {
+          width: 36px;
+          height: 36px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 10px;
+          background: #dbeafe;
+          color: #1d4ed8;
+          font-weight: 900;
+        }
+
+        .manual-card {
+          display: grid;
+          gap: 8px;
+          border: 1px solid #e5e7eb;
+          border-radius: 12px;
+          background: #ffffff;
+          padding: 14px;
+        }
+
+        .manual-card label,
+        .field span {
+          color: #374151;
+          font-size: 12px;
+          font-weight: 800;
+        }
+
+        .connected-banner {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          border: 1px solid #a7f3d0;
+          border-radius: 12px;
+          background: #ecfdf5;
+          padding: 14px;
+        }
+
+        .connected-banner > span {
+          width: 10px;
+          height: 10px;
+          border-radius: 999px;
+          background: #059669;
+        }
+
+        .connected-banner strong,
+        .connected-banner p {
+          display: block;
+          margin: 0;
+        }
+
+        .connected-banner p {
+          color: #047857;
+          font-size: 13px;
+        }
+
+        .integration-row {
+          display: grid;
+          grid-template-columns: 40px 1fr auto;
+          align-items: center;
+          gap: 14px;
+          border: 1px solid #e5e7eb;
+          border-radius: 12px;
+          background: #f9fafb;
+          padding: 14px;
+        }
+
+        .status-pill {
+          border-radius: 999px;
+          background: #eef2ff;
+          color: #4338ca;
+          padding: 5px 9px;
+          font-size: 11px;
+          font-weight: 800;
+        }
+
+        .status-pill.connected {
+          background: #dcfce7;
+          color: #047857;
+        }
+
+        .key-row {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) auto;
+          gap: 10px;
+          margin-top: 12px;
+        }
+
+        .benefit-list {
+          display: grid;
+          gap: 9px;
+          list-style: none;
+          margin: 0;
+          padding: 0;
+        }
+
+        .benefit-list li {
+          position: relative;
+          color: #374151;
+          padding-left: 22px;
+        }
+
+        .benefit-list li::before {
           content: '';
           position: absolute;
           left: 0;
           top: 8px;
-          width: 8px;
-          height: 8px;
-          border-radius: 50%;
-          background: #246b5f;
+          width: 7px;
+          height: 7px;
+          border-radius: 999px;
+          background: #2563eb;
         }
 
-        .fine-print {
-          color: #76736b;
-          font-size: 13px;
-        }
-
-        .connect-button {
-          width: 100%;
-          border: 1px solid #cfc7bb;
-          background: #ffffff;
-          color: #20211f;
-          border-radius: 8px;
-          padding: 16px 18px;
-          text-decoration: none;
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 12px;
-          cursor: pointer;
-          font-weight: 800;
-        }
-
-        .connect-button:hover {
-          border-color: #246b5f;
-          box-shadow: inset 0 0 0 1px #246b5f;
-        }
-
-        .button-detail {
-          color: #76736b;
-          font-size: 13px;
-          font-weight: 700;
-        }
-
-        .identity-options {
-          display: grid;
-          gap: 12px;
-        }
-
-        .manual-entry,
-        .field {
-          display: grid;
-          gap: 6px;
-        }
-
-        .field-label {
-          color: #20211f;
-          font-size: 12px;
-          font-weight: 800;
-          letter-spacing: 0.06em;
-          text-transform: uppercase;
-        }
-
-        .field-hint {
-          margin: 0;
-          color: #76736b;
-          font-size: 13px;
-        }
-
-        .text-input {
-          width: 100%;
-          border: 1px solid #cfc7bb;
-          background: #ffffff;
-          color: #20211f;
-          border-radius: 6px;
-          padding: 12px 13px;
-          outline: none;
-        }
-
-        .text-input:focus {
-          border-color: #246b5f;
-          box-shadow: 0 0 0 3px rgba(36, 107, 95, 0.14);
-        }
-
-        .state-row {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          border: 1px solid #d7e6df;
-          background: #f1faf6;
-          color: #285a50;
-          border-radius: 8px;
-          padding: 14px 16px;
-          font-weight: 700;
-        }
-
-        .state-dot {
-          width: 10px;
-          height: 10px;
-          border-radius: 50%;
-          background: #246b5f;
-        }
-
-        .profile-grid {
+        .field-grid {
           display: grid;
           grid-template-columns: repeat(2, minmax(0, 1fr));
           gap: 14px;
         }
 
-        .profile-grid .field:last-child {
+        .field {
+          display: grid;
+          gap: 7px;
+        }
+
+        .field:last-child {
           grid-column: 1 / -1;
         }
 
-        .preference-stack {
+        .field small {
+          color: #6b7280;
+          font-size: 12px;
+        }
+
+        .text-input {
+          width: 100%;
+          border: 1px solid #d1d5db;
+          border-radius: 10px;
+          background: #ffffff;
+          color: #111827;
+          padding: 11px 12px;
+          outline: none;
+          transition: border 150ms ease, box-shadow 150ms ease;
+        }
+
+        .text-input:focus {
+          border-color: #2563eb;
+          box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.14);
+        }
+
+        .text-input::placeholder {
+          color: #9ca3af;
+        }
+
+        .preference-list {
           display: grid;
           gap: 12px;
         }
 
         .preference-row,
-        .toggle-row {
-          border: 1px solid #e3ddd3;
-          border-radius: 8px;
-          background: #fbfaf8;
-          padding: 16px;
-        }
-
-        .preference-row {
+        .switch-row {
           display: grid;
-          grid-template-columns: minmax(160px, 1fr) auto;
-          gap: 16px;
+          grid-template-columns: minmax(0, 1fr) auto;
           align-items: center;
+          gap: 18px;
+          border: 1px solid #e5e7eb;
+          border-radius: 12px;
+          background: #f9fafb;
+          padding: 14px;
         }
 
-        .segmented-control {
+        .preference-row strong,
+        .switch-row strong {
+          display: block;
+          color: #111827;
+        }
+
+        .segmented {
           display: inline-flex;
-          border: 1px solid #cfc7bb;
-          border-radius: 7px;
-          padding: 3px;
+          border: 1px solid #e5e7eb;
+          border-radius: 10px;
           background: #ffffff;
+          padding: 3px;
         }
 
-        .segmented-control button {
+        .segmented button {
           border: 0;
+          border-radius: 8px;
           background: transparent;
-          color: #5c5850;
-          border-radius: 5px;
-          padding: 8px 11px;
+          color: #6b7280;
           cursor: pointer;
-          font-size: 13px;
+          padding: 7px 10px;
+          font-size: 12px;
           font-weight: 800;
         }
 
-        .segmented-control button.selected {
-          background: #246b5f;
+        .segmented button.active {
+          background: #2563eb;
           color: #ffffff;
         }
 
-        .toggle-row {
-          display: flex;
-          align-items: center;
-          gap: 12px;
+        .switch-row {
+          grid-template-columns: auto minmax(0, 1fr);
           cursor: pointer;
         }
 
-        .toggle-row input {
+        .switch-row input {
           position: absolute;
           opacity: 0;
           pointer-events: none;
         }
 
-        .toggle-track {
+        .switch-track {
           width: 42px;
           height: 24px;
           border-radius: 999px;
-          background: #cfc7bb;
+          background: #d1d5db;
           padding: 3px;
-          transition: background 160ms ease;
+          transition: background 150ms ease;
         }
 
-        .toggle-thumb {
+        .switch-track span {
           display: block;
           width: 18px;
           height: 18px;
+          border-radius: 999px;
           background: #ffffff;
-          border-radius: 50%;
-          transition: transform 160ms ease;
+          transition: transform 150ms ease;
         }
 
-        .toggle-row input:checked + .toggle-track {
-          background: #246b5f;
+        .switch-row input:checked + .switch-track {
+          background: #2563eb;
         }
 
-        .toggle-row input:checked + .toggle-track .toggle-thumb {
+        .switch-row input:checked + .switch-track span {
           transform: translateX(18px);
         }
 
-        .toggle-row strong,
-        .toggle-row small {
-          display: block;
-        }
-
-        .toggle-row small {
-          color: #76736b;
-          margin-top: 2px;
-        }
-
-        .connection-summary {
-          display: grid;
-          gap: 0;
-          padding: 0;
+        .summary-list {
+          border: 1px solid #e5e7eb;
+          border-radius: 12px;
           overflow: hidden;
         }
 
@@ -1304,9 +1491,9 @@ export default function Home() {
           display: flex;
           align-items: center;
           justify-content: space-between;
-          gap: 18px;
-          padding: 14px 16px;
-          border-bottom: 1px solid #e8e2d9;
+          gap: 16px;
+          padding: 13px 14px;
+          border-bottom: 1px solid #e5e7eb;
         }
 
         .summary-row:last-child {
@@ -1314,170 +1501,264 @@ export default function Home() {
         }
 
         .summary-row span {
-          color: #5c5850;
+          color: #6b7280;
         }
 
         .summary-row strong {
-          color: #20211f;
+          color: #111827;
+          text-align: right;
         }
 
-        .bookmark-link {
-          color: #246b5f;
-          font-weight: 800;
-          word-break: break-word;
-        }
-
-        .choice-row {
+        .action-panel {
           display: flex;
           align-items: center;
           justify-content: space-between;
-          gap: 12px;
-          padding-top: 4px;
+          gap: 18px;
         }
 
-        .choice-actions {
+        .return-link {
+          color: #2563eb;
+          font-weight: 800;
+          text-decoration: none;
+          white-space: nowrap;
+        }
+
+        .brief {
+          position: sticky;
+          top: 88px;
+          display: grid;
+          gap: 0;
+          overflow: hidden;
+        }
+
+        .brief > div {
+          padding: 18px;
+          border-bottom: 1px solid #e5e7eb;
+        }
+
+        .brief > div:last-child {
+          border-bottom: 0;
+        }
+
+        .brief span {
+          color: #6b7280;
+          margin-bottom: 8px;
+        }
+
+        .connection-line {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 10px;
+          padding: 6px 0;
+          color: #4b5563;
+          font-size: 13px;
+        }
+
+        .connection-line strong {
+          color: #9ca3af;
+          font-size: 12px;
+        }
+
+        .connection-line.connected strong {
+          color: #059669;
+        }
+
+        .action-bar {
+          position: sticky;
+          bottom: 0;
+          margin-top: auto;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 16px;
+          border-top: 1px solid #e5e7eb;
+          background: rgba(255, 255, 255, 0.92);
+          backdrop-filter: blur(14px);
+          padding: 14px 32px;
+        }
+
+        .action-bar > div {
           display: flex;
           align-items: center;
           gap: 10px;
         }
 
-        .microcopy {
-          color: #76736b;
+        .button {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          min-height: 40px;
+          border-radius: 8px;
+          cursor: pointer;
+          font-size: 14px;
+          font-weight: 650;
+          padding: 0 16px;
+          text-decoration: none;
+          transition: background 150ms ease, border 150ms ease, color 150ms ease, box-shadow 150ms ease;
+        }
+
+        .button.primary {
+          border: 1px solid #2563eb;
+          background: #2563eb;
+          color: #ffffff;
+          box-shadow: 0 1px 2px rgba(37, 99, 235, 0.12);
+        }
+
+        .button.primary:hover:not(:disabled) {
+          background: #1d4ed8;
+          border-color: #1d4ed8;
+        }
+
+        .button.secondary {
+          border: 1px solid #d1d5db;
+          background: #ffffff;
+          color: #111827;
+        }
+
+        .button.secondary:hover:not(:disabled) {
+          border-color: #93c5fd;
+          background: #eff6ff;
+          color: #1d4ed8;
+        }
+
+        .button.ghost {
+          border: 1px solid transparent;
+          background: transparent;
+          color: #4b5563;
+          font-weight: 600;
+        }
+
+        .button.ghost:hover:not(:disabled) {
+          background: #f3f4f6;
+          color: #111827;
+        }
+
+        .button.compact {
+          min-height: 34px;
+          border-radius: 7px;
+          padding: 0 12px;
           font-size: 13px;
         }
 
-        .btn-primary,
-        .btn-secondary,
-        .btn-quiet,
-        .btn-text {
-          border-radius: 6px;
-          cursor: pointer;
-          font-weight: 800;
-          min-height: 42px;
-          padding: 0 16px;
-        }
-
-        .btn-primary {
-          border: 1px solid #246b5f;
-          background: #246b5f;
-          color: #ffffff;
-        }
-
-        .btn-primary:hover {
-          background: #1e5a50;
-        }
-
-        .btn-primary:disabled,
-        .btn-secondary:disabled {
-          opacity: 0.45;
+        .button:disabled {
           cursor: not-allowed;
+          opacity: 0.45;
         }
 
-        .btn-secondary {
-          border: 1px solid #cfc7bb;
-          background: #ffffff;
-          color: #20211f;
-        }
-
-        .btn-secondary:hover,
-        .btn-quiet:hover,
-        .btn-text:hover {
-          background: #f3f0ea;
-        }
-
-        .btn-quiet,
-        .btn-text {
-          border: 1px solid transparent;
-          background: transparent;
-          color: #5c5850;
-        }
-
-        .btn-text {
-          color: #246b5f;
-        }
-
-        @media (max-width: 900px) {
-          .app-shell {
-            padding: 18px;
-          }
-
-          .setup-layout {
+        @media (max-width: 980px) {
+          .app {
             grid-template-columns: 1fr;
           }
 
-          .setup-rail {
+          .rail {
             position: static;
-          }
-
-          .step-list {
+            height: auto;
             display: grid;
-            grid-template-columns: repeat(2, minmax(0, 1fr));
+            grid-template-columns: minmax(0, 1fr) minmax(180px, 280px);
+            align-items: center;
+            gap: 16px;
+            border-right: 0;
+            border-bottom: 1px solid #e5e7eb;
+            padding: 16px 18px;
           }
 
-          .workspace {
-            min-height: 0;
+          .brand,
+          .progress-block {
+            margin: 0;
+          }
+
+          .step-nav,
+          .rail-footer {
+            display: none;
+          }
+
+          .content-grid {
+            grid-template-columns: 1fr;
+          }
+
+          .brief {
+            position: static;
           }
         }
 
-        @media (max-width: 680px) {
-          .app-shell {
-            padding: 12px;
+        @media (max-width: 700px) {
+          .topbar,
+          .action-bar {
+            padding-left: 18px;
+            padding-right: 18px;
           }
 
-          .topbar {
-            align-items: flex-start;
-            flex-direction: column;
+          .rail {
+            grid-template-columns: 1fr;
           }
 
-          .workspace {
-            padding: 22px;
+          .content-grid {
+            padding: 28px 18px 22px;
           }
 
-          .step-header h1 {
+          .hero-copy h1 {
             font-size: 32px;
           }
 
-          .explain-strip,
-          .intro-grid,
-          .summary-grid,
-          .profile-grid,
-          .preference-row {
+          .overview-grid,
+          .field-grid,
+          .preference-row,
+          .integration-row,
+          .key-row {
             grid-template-columns: 1fr;
           }
 
-          .flow-preview,
-          .step-list {
+          .integration-row {
+            align-items: start;
+          }
+
+          .button.secondary.compact {
+            width: 100%;
+          }
+
+          .step-nav {
             grid-template-columns: 1fr;
           }
 
-          .choice-row,
-          .choice-actions {
+          .action-bar,
+          .action-bar > div {
             align-items: stretch;
             flex-direction: column;
           }
 
-          .choice-row > *,
-          .choice-actions,
-          .choice-actions > *,
-          .btn-primary,
-          .btn-secondary,
-          .btn-quiet,
-          .btn-text {
+          .action-bar .button,
+          .action-bar > div {
             width: 100%;
           }
 
-          .segmented-control {
+          .segmented {
             display: grid;
             grid-template-columns: repeat(3, minmax(0, 1fr));
             width: 100%;
           }
-
-          .segmented-control button {
-            padding-left: 6px;
-            padding-right: 6px;
-          }
         }
-      `}</style>
+      `,
+        }}
+      />
     </>
+  );
+}
+
+function SummaryRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="summary-row">
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  );
+}
+
+function ConnectionLine({ label, connected }: { label: string; connected: boolean }) {
+  return (
+    <div className={`connection-line ${connected ? 'connected' : ''}`}>
+      <span>{label}</span>
+      <strong>{connected ? 'Connected' : 'Not connected'}</strong>
+    </div>
   );
 }
