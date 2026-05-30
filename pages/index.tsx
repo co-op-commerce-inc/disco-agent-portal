@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 function getUrlParam(key: string): string {
   if (typeof window === 'undefined') return '';
@@ -6,33 +6,186 @@ function getUrlParam(key: string): string {
 }
 
 const WEBHOOK_BASE = 'https://dias-mac-studio.tail4f36cb.ts.net/webhooks';
-const TOTAL_STEPS = 8;
 
-// Steps definition
 const STEPS = [
-  { key: 'welcome', label: 'Welcome', num: 1 },
-  { key: 'slack', label: 'Slack', num: 2 },
-  { key: 'google', label: 'Google', num: 3 },
-  { key: 'github', label: 'GitHub', num: 4 },
-  { key: 'granola', label: 'Granola', num: 5 },
-  { key: 'profile', label: 'Profile', num: 6 },
-  { key: 'style', label: 'Style', num: 7 },
-  { key: 'done', label: 'Done', num: 8 },
+  {
+    key: 'welcome',
+    label: 'Overview',
+    eyebrow: 'Start here',
+    title: 'Set up the agent that works beside you.',
+    summary:
+      'This portal connects your work systems, gives the agent basic context about your role, and sets expectations for how it should communicate.',
+    why:
+      'The agent is most useful when it can see the same signals you already use: Slack identity, calendar and email, code activity, meeting notes, and your current priorities.',
+    outcome: 'You will leave with a Slack-ready agent, a saved profile, and a clear next step.',
+  },
+  {
+    key: 'slack',
+    label: 'Identity',
+    eyebrow: 'Required',
+    title: 'Tell the agent who you are in Slack.',
+    summary:
+      'Slack is the home base. This identity lets the agent recognize your DMs, personalize responses, and route setup data to the right profile.',
+    why:
+      'Without a Slack user ID, the agent cannot reliably connect these settings to the person who will actually use it.',
+    outcome: 'Your profile is anchored to a Slack member ID.',
+  },
+  {
+    key: 'google',
+    label: 'Calendar and mail',
+    eyebrow: 'Recommended',
+    title: 'Connect Google for schedule and inbox context.',
+    summary:
+      'Google gives the agent enough context to help with calendar questions, meeting prep, follow-ups, and email summaries.',
+    why:
+      'Most useful agent work starts with time and context: what is coming up, what changed, and what needs attention.',
+    outcome: 'The agent can reason over the Google permissions you grant.',
+  },
+  {
+    key: 'github',
+    label: 'Code context',
+    eyebrow: 'Recommended for builders',
+    title: 'Connect GitHub for repo and PR awareness.',
+    summary:
+      'GitHub lets the agent help with pull requests, code search, issue context, and summaries of engineering work.',
+    why:
+      'When code activity is connected, the agent can answer questions with project context instead of generic guesses.',
+    outcome: 'The agent can reference your connected GitHub workspace.',
+  },
+  {
+    key: 'granola',
+    label: 'Meetings',
+    eyebrow: 'Optional',
+    title: 'Connect Granola for meeting memory.',
+    summary:
+      'Granola notes help the agent remember decisions, commitments, and follow-ups that usually disappear after a meeting ends.',
+    why:
+      'Meeting context turns the agent from a question-answering tool into something that can help keep momentum.',
+    outcome: 'Meeting notes and action items can become part of the agent context.',
+  },
+  {
+    key: 'profile',
+    label: 'Work profile',
+    eyebrow: 'Personalization',
+    title: 'Give the agent your operating context.',
+    summary:
+      'A short profile tells the agent what you do, what you are focused on, and what outcomes matter right now.',
+    why:
+      'The same information can be urgent for one person and noise for another. Your profile helps the agent prioritize.',
+    outcome: 'Responses can be tailored to your role, team, timezone, and goals.',
+  },
+  {
+    key: 'style',
+    label: 'Behavior',
+    eyebrow: 'Preferences',
+    title: 'Choose how the agent should show up.',
+    summary:
+      'Tune response length, proactivity, formatting, and tone so the agent matches your working style from day one.',
+    why:
+      'A useful agent should not make you repeatedly correct its voice, pacing, or level of detail.',
+    outcome: 'Your communication preferences are saved with the profile.',
+  },
+  {
+    key: 'done',
+    label: 'Ready',
+    eyebrow: 'Complete',
+    title: 'Your agent setup is ready.',
+    summary:
+      'You have created the profile the agent will use when it works with you in Slack and across connected services.',
+    why:
+      'This summary is your handoff point: what is connected, what was skipped, and how to start using the agent.',
+    outcome: 'Start in Slack, then come back anytime to adjust the setup.',
+  },
 ] as const;
 
-type StepKey = typeof STEPS[number]['key'];
+type StepKey = (typeof STEPS)[number]['key'];
+type ServiceName = 'google' | 'github' | 'granola';
+
+const SERVICE_COPY: Record<
+  ServiceName,
+  { label: string; gains: string[]; note: string; connectLabel: string }
+> = {
+  google: {
+    label: 'Google',
+    gains: [
+      'Find open time and understand calendar conflicts',
+      'Summarize email threads and surface follow-ups',
+      'Use Drive context when files and projects matter',
+    ],
+    note: 'You stay in control of the permissions granted in the Google consent screen.',
+    connectLabel: 'Connect Google',
+  },
+  github: {
+    label: 'GitHub',
+    gains: [
+      'Review and summarize pull requests',
+      'Search code and explain project structure',
+      'Track issues and changes across repositories',
+    ],
+    note: 'Use the OAuth prompt to grant repo access appropriate for your work.',
+    connectLabel: 'Connect GitHub',
+  },
+  granola: {
+    label: 'Granola',
+    gains: [
+      'Summarize meeting notes and transcripts',
+      'Recover decisions from past conversations',
+      'Track action items without manual copy-paste',
+    ],
+    note: 'Paste your Granola API key only if you want meeting memory connected now.',
+    connectLabel: 'Save Granola key',
+  },
+};
+
+const PROFILE_FIELDS = [
+  { key: 'role', label: 'Role', placeholder: 'Product Engineer', hint: 'What should the agent assume you are responsible for?' },
+  { key: 'team', label: 'Team', placeholder: 'Marketplace', hint: 'Which group should context be organized around?' },
+  { key: 'timezone', label: 'Timezone', placeholder: 'America/Los_Angeles', hint: 'Used for briefings, reminders, and scheduling.' },
+  { key: 'focus', label: 'Current focus', placeholder: 'Q2 planning, auction model', hint: 'The top one or two things you are actively driving.' },
+  { key: 'goals', label: 'Goals', placeholder: 'Ship auction V2 by end of month', hint: 'Outcomes the agent should help protect.' },
+] as const;
+
+const STYLE_FIELDS = [
+  {
+    key: 'verbosity',
+    label: 'Response depth',
+    desc: 'How much context should the agent include by default?',
+    options: [
+      { value: 'concise', label: 'Concise' },
+      { value: 'detailed', label: 'Detailed' },
+    ],
+  },
+  {
+    key: 'proactivity',
+    label: 'Initiative',
+    desc: 'How often should the agent suggest next steps?',
+    options: [
+      { value: 'low', label: 'Low' },
+      { value: 'medium', label: 'Balanced' },
+      { value: 'high', label: 'High' },
+    ],
+  },
+  {
+    key: 'format',
+    label: 'Structure',
+    desc: 'How should longer answers be organized?',
+    options: [
+      { value: 'bullets', label: 'Bullets' },
+      { value: 'paragraphs', label: 'Paragraphs' },
+      { value: 'mixed', label: 'Mixed' },
+    ],
+  },
+] as const;
 
 export default function Home() {
   const [userId, setUserId] = useState(() => getUrlParam('id') || getUrlParam('userId') || '');
-  const [userName, setUserName] = useState(() => getUrlParam('name') || '');
+  const [userName] = useState(() => getUrlParam('name') || '');
   const [step, setStep] = useState<StepKey>('welcome');
   const [services, setServices] = useState<Record<string, boolean>>({});
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
-
   const [granolaKey, setGranolaKey] = useState('');
   const [granolaSaved, setGranolaSaved] = useState(false);
-
   const [profile, setProfile] = useState({
     role: '',
     team: '',
@@ -40,7 +193,6 @@ export default function Home() {
     focus: '',
     goals: '',
   });
-
   const [style, setStyle] = useState({
     verbosity: 'concise',
     proactivity: 'medium',
@@ -49,33 +201,38 @@ export default function Home() {
     emoji: true,
   });
 
-  const currentStepIndex = STEPS.findIndex((s) => s.key === step);
+  const currentStepIndex = STEPS.findIndex((item) => item.key === step);
+  const currentStep = STEPS[currentStepIndex];
+  const completedCount = useMemo(() => {
+    let count = currentStepIndex;
+    if (step === 'done') count = STEPS.length;
+    return Math.max(0, count);
+  }, [currentStepIndex, step]);
+  const progress = Math.round((completedCount / (STEPS.length - 1)) * 100);
 
-  // Navigate between steps
   const goTo = useCallback((nextStep: StepKey) => {
     setStep(nextStep);
     setMessage('');
   }, []);
 
   const nextStep = useCallback(() => {
-    const currentIdx = STEPS.findIndex((s) => s.key === step);
+    const currentIdx = STEPS.findIndex((item) => item.key === step);
     if (currentIdx < STEPS.length - 1) {
       goTo(STEPS[currentIdx + 1].key);
     }
-  }, [step, goTo]);
+  }, [goTo, step]);
 
   const prevStep = useCallback(() => {
-    const currentIdx = STEPS.findIndex((s) => s.key === step);
+    const currentIdx = STEPS.findIndex((item) => item.key === step);
     if (currentIdx > 0) {
       goTo(STEPS[currentIdx - 1].key);
     }
-  }, [step, goTo]);
+  }, [goTo, step]);
 
-  // Handle OAuth popup messages
   useEffect(() => {
     const handler = (event: MessageEvent) => {
       if (event.data && event.data.type === 'oauth-connected') {
-        setServices((s) => ({ ...s, [event.data.service]: true }));
+        setServices((existing) => ({ ...existing, [event.data.service]: true }));
         setMessage(`${event.data.service} connected.`);
       }
     };
@@ -83,26 +240,35 @@ export default function Home() {
     return () => window.removeEventListener('message', handler);
   }, []);
 
-  const connectOAuth = (service: string) => {
+  const connectOAuth = (service: ServiceName) => {
     if (!userId) {
-      setMessage('Enter your Slack User ID first.');
+      setMessage('Add your Slack User ID first so this connection can be saved to your profile.');
+      goTo('slack');
       return;
     }
+
     const popup = window.open(
       `/api/oauth/${service}?user=${userId}`,
       `${service}-oauth`,
       'width=600,height=700'
     );
+
     if (!popup) {
-      setMessage('Please allow popups for this site.');
+      setMessage('Please allow popups for this site, then try the connection again.');
       return;
     }
-    setMessage(`A popup opened — approve the ${service} prompt.`);
+
+    setMessage(`A ${SERVICE_COPY[service].label} approval window opened.`);
   };
 
-  // Save Granola API key
   const saveGranolaKey = async () => {
     if (!granolaKey.trim()) return;
+    if (!userId) {
+      setMessage('Add your Slack User ID first so the Granola key is saved to the right profile.');
+      goTo('slack');
+      return;
+    }
+
     setLoading(true);
     try {
       await fetch(`${WEBHOOK_BASE}/oauth-granola`, {
@@ -115,15 +281,14 @@ export default function Home() {
         }),
       });
       setGranolaSaved(true);
-      setServices((s) => ({ ...s, granola: true }));
-      setMessage('Granola API key saved.');
+      setServices((existing) => ({ ...existing, granola: true }));
+      setMessage('Granola key saved.');
     } catch {
-      setMessage('Failed to save Granola key.');
+      setMessage('Granola key could not be saved. You can skip it and connect later.');
     }
     setLoading(false);
   };
 
-  // Submit onboarding to webhook
   const submitOnboarding = async () => {
     setLoading(true);
     try {
@@ -141,46 +306,131 @@ export default function Home() {
       });
       setMessage('Profile saved.');
     } catch {
-      // non-fatal
+      setMessage('Setup saved locally. The profile webhook did not respond.');
     }
     setLoading(false);
-    nextStep();
+    goTo('done');
   };
 
-  // ── Step content ──
+  const canOpenStep = (targetIndex: number) => {
+    if (targetIndex <= currentStepIndex) return true;
+    if (STEPS[targetIndex].key === 'done') return step === 'done';
+    if (STEPS[targetIndex].key !== 'slack' && !userId) return false;
+    return true;
+  };
+
+  const statusForService = (service: ServiceName) => {
+    if (service === 'granola') return granolaSaved || services.granola;
+    return services[service];
+  };
+
+  const renderServiceStep = (service: ServiceName) => {
+    const copy = SERVICE_COPY[service];
+    const connected = statusForService(service);
+
+    return (
+      <div className="section-stack">
+        <div className="decision-panel">
+          <div>
+            <p className="panel-kicker">What this unlocks</p>
+            <h3>{copy.label} context</h3>
+          </div>
+          <ul className="check-list">
+            {copy.gains.map((gain) => (
+              <li key={gain}>{gain}</li>
+            ))}
+          </ul>
+          <p className="fine-print">{copy.note}</p>
+        </div>
+
+        {connected ? (
+          <div className="state-row success">
+            <span className="state-dot" />
+            <span>{copy.label} is connected.</span>
+          </div>
+        ) : service === 'granola' ? (
+          <div className="form-block">
+            <label className="field-label" htmlFor="granola-key">
+              Granola API key
+            </label>
+            <input
+              id="granola-key"
+              type="password"
+              placeholder="Paste your Granola API key"
+              value={granolaKey}
+              onChange={(event) => setGranolaKey(event.target.value)}
+              className="text-input"
+            />
+            <p className="field-hint">Find it in Granola Settings, then API.</p>
+            <button
+              onClick={saveGranolaKey}
+              disabled={!granolaKey.trim() || loading}
+              className="btn-secondary"
+            >
+              {loading ? 'Saving...' : copy.connectLabel}
+            </button>
+          </div>
+        ) : (
+          <button onClick={() => connectOAuth(service)} className="connect-button">
+            <span>{copy.connectLabel}</span>
+            <span className="button-detail">Opens secure approval</span>
+          </button>
+        )}
+
+        <div className="choice-row">
+          <button onClick={prevStep} className="btn-quiet">
+            Back
+          </button>
+          <div className="choice-actions">
+            {!connected && (
+              <button onClick={nextStep} className="btn-text">
+                Skip for now
+              </button>
+            )}
+            <button onClick={nextStep} className="btn-primary">
+              Continue
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const renderStep = () => {
     switch (step) {
       case 'welcome':
         return (
-          <div className="step-content">
-            <h1 className="serif-heading">Disco Agent Portal</h1>
-            <p className="step-description">
-              Your personal AI agent, tuned to how you work. We'll walk through a quick setup to
-              connect your services and personalize your experience.
-            </p>
-            <hr className="step-hr" />
-            <div className="feature-list">
-              <div className="feature-item">
-                <span className="feature-icon">1.</span>
-                <span>Talk to your agent in Slack — DM or @mention</span>
+          <div className="section-stack">
+            <div className="intro-grid">
+              <div>
+                <p className="panel-kicker">Setup path</p>
+                <h3>What you are building</h3>
+                <p>
+                  A personal agent profile that ties together your identity, connected tools,
+                  priorities, and communication preferences.
+                </p>
               </div>
-              <div className="feature-item">
-                <span className="feature-icon">2.</span>
-                <span>Connected to your calendar, email, GitHub, and Granola</span>
-              </div>
-              <div className="feature-item">
-                <span className="feature-icon">3.</span>
-                <span>Query company data, review PRs, summarize meetings</span>
-              </div>
-              <div className="feature-item">
-                <span className="feature-icon">4.</span>
-                <span>Personal cron jobs, briefings, and more</span>
+              <div>
+                <p className="panel-kicker">Time needed</p>
+                <h3>About five minutes</h3>
+                <p>
+                  Slack is required. Google, GitHub, and Granola can be connected now or skipped
+                  until you are ready.
+                </p>
               </div>
             </div>
-            <div className="step-actions">
-              <div />
+            <div className="flow-preview">
+              {STEPS.slice(1, -1).map((item) => (
+                <div key={item.key} className="flow-item">
+                  <span>{item.label}</span>
+                  <small>{item.eyebrow}</small>
+                </div>
+              ))}
+            </div>
+            <div className="choice-row">
+              <span className="microcopy">You can change these settings later.</span>
               <button onClick={() => goTo('slack')} className="btn-primary">
-                Get started &rarr;
+                Begin setup
               </button>
             </div>
           </div>
@@ -188,231 +438,109 @@ export default function Home() {
 
       case 'slack':
         return (
-          <div className="step-content">
-            <h2 className="serif-heading">Connect your Slack identity</h2>
-            <p className="step-description">
-              Your agent lives in Slack — it's where you'll chat with it every day.
-              We need your Slack ID so it knows who you are.
-            </p>
-            <hr className="step-hr" />
-            <div className="step-body">
-              {!userId ? (
-                <>
-                  <a
-                    href={`https://slack.com/openid/connect/authorize?response_type=code&client_id=879184060177.11209135000535&scope=openid,profile,email&redirect_uri=${encodeURIComponent(
-                      'https://disco-agent-portal.vercel.app/api/oauth/slack'
-                    )}`}
-                    className="oauth-btn"
-                  >
-                    Sign in with Slack
-                  </a>
-                  <div className="or-divider">
-                    <span>or enter your Slack User ID</span>
-                  </div>
-                  <div className="input-group">
-                    <input
-                      placeholder="e.g. URTU2JQCT"
-                      onChange={(e) => {
-                        if (e.target.value.length >= 8) setUserId(e.target.value.trim());
-                      }}
-                      className="text-input"
-                    />
-                    <p className="input-hint">
-                      Slack &rarr; Profile &rarr; &ctdot; &rarr; <strong>Copy member ID</strong>
-                    </p>
-                  </div>
-                </>
-              ) : (
-                <div className="connected-row">
-                  <span className="connected-indicator" />
-                  <span>Signed in as <strong>{userId}</strong></span>
-                </div>
-              )}
+          <div className="section-stack">
+            <div className="decision-panel">
+              <div>
+                <p className="panel-kicker">Required first</p>
+                <h3>Slack is the account anchor</h3>
+              </div>
+              <p>
+                Every connection in this setup is saved against your Slack identity. The agent uses
+                it to know when a message, briefing, or saved preference belongs to you.
+              </p>
             </div>
-            <div className="step-actions">
-              <button onClick={prevStep} className="btn-ghost">&larr; Back</button>
-              <button
-                onClick={() => nextStep()}
-                disabled={!userId}
-                className="btn-primary"
-              >
-                Continue &rarr;
+
+            {!userId ? (
+              <div className="identity-options">
+                <a
+                  href={`https://slack.com/openid/connect/authorize?response_type=code&client_id=879184060177.11209135000535&scope=openid,profile,email&redirect_uri=${encodeURIComponent(
+                    'https://disco-agent-portal.vercel.app/api/oauth/slack'
+                  )}`}
+                  className="connect-button"
+                >
+                  <span>Sign in with Slack</span>
+                  <span className="button-detail">Recommended</span>
+                </a>
+                <div className="manual-entry">
+                  <label className="field-label" htmlFor="slack-id">
+                    Or enter Slack member ID
+                  </label>
+                  <input
+                    id="slack-id"
+                    placeholder="Example: URTU2JQCT"
+                    onChange={(event) => setUserId(event.target.value.trim())}
+                    className="text-input"
+                  />
+                  <p className="field-hint">Slack profile, more menu, Copy member ID.</p>
+                </div>
+              </div>
+            ) : (
+              <div className="state-row success">
+                <span className="state-dot" />
+                <span>
+                  Slack identity saved as <strong>{userId}</strong>.
+                </span>
+              </div>
+            )}
+
+            <div className="choice-row">
+              <button onClick={prevStep} className="btn-quiet">
+                Back
+              </button>
+              <button onClick={nextStep} disabled={!userId} className="btn-primary">
+                Continue
               </button>
             </div>
           </div>
         );
 
       case 'google':
-        return (
-          <div className="step-content">
-            <h2 className="serif-heading">Connect Google</h2>
-            <p className="step-description">
-              Connect Google so your agent can read your calendar, summarize emails,
-              and store files in your Drive. Only accesses what you explicitly grant.
-            </p>
-            <hr className="step-hr" />
-            <div className="step-body">
-              {services.google ? (
-                <div className="connected-row">
-                  <span className="connected-indicator green" />
-                  <span>Google connected</span>
-                </div>
-              ) : (
-                <button onClick={() => connectOAuth('google')} className="oauth-btn">
-                  Connect Google Account
-                </button>
-              )}
-              <ul className="perm-list">
-                <li>Calendar — find your free/busy times</li>
-                <li>Gmail — summarize and search email</li>
-                <li>Drive — store your files and projects</li>
-              </ul>
-            </div>
-            <div className="step-actions">
-              <button onClick={prevStep} className="btn-ghost">&larr; Back</button>
-              <button onClick={() => nextStep()} className="btn-primary">
-                Continue &rarr;
-              </button>
-            </div>
-          </div>
-        );
+        return renderServiceStep('google');
 
       case 'github':
-        return (
-          <div className="step-content">
-            <h2 className="serif-heading">Connect GitHub</h2>
-            <p className="step-description">
-              Connect GitHub so your agent can review PRs, search your codebase,
-              and help you understand changes across your repos.
-            </p>
-            <hr className="step-hr" />
-            <div className="step-body">
-              {services.github ? (
-                <div className="connected-row">
-                  <span className="connected-indicator green" />
-                  <span>GitHub connected</span>
-                </div>
-              ) : (
-                <>
-                  <button onClick={() => connectOAuth('github')} className="oauth-btn">
-                    Connect GitHub Account
-                  </button>
-                  <div className="setup-instructions">
-                    <div className="setup-title">Setup instructions</div>
-                    <p>
-                      Create an OAuth app at{' '}
-                      <a href="https://github.com/settings/developers" target="_blank" rel="noopener">
-                        github.com/settings/developers
-                      </a>{' '}
-                      with callback URL{' '}
-                      <code>https://disco-agent-portal.vercel.app/api/oauth/github</code>,
-                      then enter your Client ID and Secret below.
-                    </p>
-                  </div>
-                </>
-              )}
-              <ul className="perm-list">
-                <li>Repos — search and understand your code</li>
-                <li>Pull Requests — review and summarize PRs</li>
-                <li>Issues — track work across projects</li>
-              </ul>
-            </div>
-            <div className="step-actions">
-              <button onClick={prevStep} className="btn-ghost">&larr; Back</button>
-              <button onClick={() => nextStep()} className="btn-primary">
-                Continue &rarr;
-              </button>
-            </div>
-          </div>
-        );
+        return renderServiceStep('github');
 
       case 'granola':
-        return (
-          <div className="step-content">
-            <h2 className="serif-heading">Connect Granola</h2>
-            <p className="step-description">
-              Granola is your AI meeting assistant — connect it so your agent can access
-              your meeting notes and summaries. Paste your Granola API key below.
-            </p>
-            <hr className="step-hr" />
-            <div className="step-body">
-              {granolaSaved || services.granola ? (
-                <div className="connected-row">
-                  <span className="connected-indicator green" />
-                  <span>Granola connected</span>
-                </div>
-              ) : (
-                <div className="input-group">
-                  <input
-                    type="password"
-                    placeholder="Paste your Granola API key"
-                    value={granolaKey}
-                    onChange={(e) => setGranolaKey(e.target.value)}
-                    className="text-input"
-                  />
-                  <p className="input-hint">
-                    Find your API key in Granola Settings &rarr; API.
-                  </p>
-                  <button
-                    onClick={saveGranolaKey}
-                    disabled={!granolaKey.trim() || loading}
-                    className="btn-primary"
-                    style={{ marginTop: '12px' }}
-                  >
-                    {loading ? 'Saving...' : 'Save API Key'}
-                  </button>
-                </div>
-              )}
-              <ul className="perm-list">
-                <li>Meeting notes — access and summarize your meetings</li>
-                <li>Transcripts — search past conversations</li>
-                <li>Action items — track follow-ups automatically</li>
-              </ul>
-            </div>
-            <div className="step-actions">
-              <button onClick={prevStep} className="btn-ghost">&larr; Back</button>
-              <button onClick={() => nextStep()} className="btn-primary">
-                Continue &rarr;
-              </button>
-            </div>
-          </div>
-        );
+        return renderServiceStep('granola');
 
       case 'profile':
         return (
-          <div className="step-content">
-            <h2 className="serif-heading">Tell us about yourself</h2>
-            <p className="step-description">
-              The more your agent knows about your role and goals, the more helpful it can be.
-              This helps prioritize information and tailor responses to what matters to you.
-            </p>
-            <hr className="step-hr" />
-            <div className="step-body">
-              <div className="profile-grid">
-                {[
-                  { key: 'role', label: 'Role', placeholder: 'Product Engineer', hint: 'What do you do?' },
-                  { key: 'team', label: 'Team', placeholder: 'Marketplace', hint: 'Which team are you on?' },
-                  { key: 'timezone', label: 'Timezone', placeholder: 'America/Los_Angeles' },
-                  { key: 'focus', label: 'Current Focus', placeholder: 'Q2 planning, auction model', hint: 'Top 1-2 things right now' },
-                  { key: 'goals', label: 'Goals', placeholder: 'Ship auction V2 by EOM', hint: 'What outcomes are you driving?' },
-                ].map((f) => (
-                  <div key={f.key} className="field">
-                    <label className="field-label">{f.label}</label>
-                    {f.hint && <div className="field-hint">{f.hint}</div>}
-                    <input
-                      value={(profile as any)[f.key]}
-                      onChange={(e) => setProfile({ ...profile, [f.key]: e.target.value })}
-                      placeholder={f.placeholder}
-                      className="text-input"
-                    />
-                  </div>
-                ))}
+          <div className="section-stack">
+            <div className="decision-panel">
+              <div>
+                <p className="panel-kicker">Personal context</p>
+                <h3>Help the agent filter what matters</h3>
               </div>
+              <p>
+                These answers become defaults for prioritization, reminders, summaries, and the
+                way the agent frames recommendations.
+              </p>
             </div>
-            <div className="step-actions">
-              <button onClick={prevStep} className="btn-ghost">&larr; Back</button>
-              <button onClick={() => nextStep()} className="btn-primary">
-                Continue &rarr;
+            <div className="profile-grid">
+              {PROFILE_FIELDS.map((field) => (
+                <div key={field.key} className="field">
+                  <label className="field-label" htmlFor={field.key}>
+                    {field.label}
+                  </label>
+                  <input
+                    id={field.key}
+                    value={profile[field.key]}
+                    onChange={(event) =>
+                      setProfile({ ...profile, [field.key]: event.target.value })
+                    }
+                    placeholder={field.placeholder}
+                    className="text-input"
+                  />
+                  <p className="field-hint">{field.hint}</p>
+                </div>
+              ))}
+            </div>
+            <div className="choice-row">
+              <button onClick={prevStep} className="btn-quiet">
+                Back
+              </button>
+              <button onClick={nextStep} className="btn-primary">
+                Continue
               </button>
             </div>
           </div>
@@ -420,66 +548,58 @@ export default function Home() {
 
       case 'style':
         return (
-          <div className="step-content">
-            <h2 className="serif-heading">Communication style</h2>
-            <p className="step-description">
-              Tune how your agent communicates — short and direct or thorough with context.
-              You can always change this later.
-            </p>
-            <hr className="step-hr" />
-            <div className="step-body">
-              <div className="style-grid">
-                {[
-                  {
-                    key: 'verbosity',
-                    label: 'Response Style',
-                    desc: 'Concise and direct, or detailed with full context?',
-                    options: ['concise', 'detailed'],
-                  },
-                  {
-                    key: 'proactivity',
-                    label: 'Proactivity',
-                    desc: 'Wait to be asked, or proactively suggest things?',
-                    options: ['low', 'medium', 'high'],
-                  },
-                  {
-                    key: 'format',
-                    label: 'Format',
-                    desc: 'How should messages be structured?',
-                    options: ['bullets', 'paragraphs', 'mixed'],
-                  },
-                ].map((f) => (
-                  <div key={f.key} className="style-field">
-                    <label className="field-label">{f.label}</label>
-                    <div className="field-hint">{f.desc}</div>
-                    <div className="pill-group">
-                      {f.options.map((o) => (
-                        <button
-                          key={o}
-                          onClick={() => setStyle({ ...style, [f.key]: o })}
-                          className={`pill ${(style as any)[f.key] === o ? 'active' : ''}`}
-                        >
-                          {o}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-                <label className="checkbox-label">
-                  <input
-                    type="checkbox"
-                    checked={style.emoji}
-                    onChange={(e) => setStyle({ ...style, emoji: e.target.checked })}
-                  />
-                  <span className="checkbox-custom" />
-                  <span>Use emoji in responses</span>
-                </label>
+          <div className="section-stack">
+            <div className="decision-panel">
+              <div>
+                <p className="panel-kicker">Agent behavior</p>
+                <h3>Set the default working style</h3>
               </div>
+              <p>
+                These preferences shape day-to-day answers. They are intentionally practical:
+                depth, initiative, structure, and tone.
+              </p>
             </div>
-            <div className="step-actions">
-              <button onClick={prevStep} className="btn-ghost">&larr; Back</button>
+            <div className="preference-stack">
+              {STYLE_FIELDS.map((field) => (
+                <div key={field.key} className="preference-row">
+                  <div>
+                    <label className="field-label">{field.label}</label>
+                    <p className="field-hint">{field.desc}</p>
+                  </div>
+                  <div className="segmented-control">
+                    {field.options.map((option) => (
+                      <button
+                        key={option.value}
+                        onClick={() => setStyle({ ...style, [field.key]: option.value })}
+                        className={style[field.key] === option.value ? 'selected' : ''}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+              <label className="toggle-row">
+                <input
+                  type="checkbox"
+                  checked={style.emoji}
+                  onChange={(event) => setStyle({ ...style, emoji: event.target.checked })}
+                />
+                <span className="toggle-track">
+                  <span className="toggle-thumb" />
+                </span>
+                <span>
+                  <strong>Allow emoji</strong>
+                  <small>Use sparingly when it fits the conversation.</small>
+                </span>
+              </label>
+            </div>
+            <div className="choice-row">
+              <button onClick={prevStep} className="btn-quiet">
+                Back
+              </button>
               <button onClick={submitOnboarding} className="btn-primary">
-                {loading ? 'Saving...' : 'Finish Setup &rarr;'}
+                {loading ? 'Saving...' : 'Finish setup'}
               </button>
             </div>
           </div>
@@ -487,68 +607,51 @@ export default function Home() {
 
       case 'done':
         return (
-          <div className="step-content">
-            <h2 className="serif-heading">You're all set</h2>
-            <p className="step-description">
-              Your agent is ready to work with you.
-            </p>
-            <hr className="step-hr" />
-            <div className="done-summary">
-              <h3 className="done-summary-heading">Setup Summary</h3>
-              <div className="summary-list">
-                <div className="summary-row">
-                  <span className="summary-label">Google</span>
-                  <span className="summary-status">{services.google ? 'Connected' : 'Skipped'}</span>
-                </div>
-                <div className="summary-row">
-                  <span className="summary-label">GitHub</span>
-                  <span className="summary-status">{services.github ? 'Connected' : 'Skipped'}</span>
-                </div>
-                <div className="summary-row">
-                  <span className="summary-label">Granola</span>
-                  <span className="summary-status">{granolaSaved || services.granola ? 'Connected' : 'Skipped'}</span>
-                </div>
-                <div className="summary-row">
-                  <span className="summary-label">Slack</span>
-                  <span className="summary-status">{userId}</span>
-                </div>
-                <div className="summary-row">
-                  <span className="summary-label">Profile</span>
-                  <span className="summary-status">{profile.role || 'Not set'}</span>
-                </div>
-                <div className="summary-row">
-                  <span className="summary-label">Style</span>
-                  <span className="summary-status">{style.verbosity} &middot; {style.proactivity}</span>
-                </div>
+          <div className="section-stack">
+            <div className="summary-grid">
+              <div className="summary-block">
+                <p className="panel-kicker">Profile</p>
+                <h3>{profile.role || 'Role not set'}</h3>
+                <p>{profile.team || 'No team added'} / {profile.timezone}</p>
+              </div>
+              <div className="summary-block">
+                <p className="panel-kicker">Style</p>
+                <h3>{style.verbosity} / {style.proactivity}</h3>
+                <p>{style.format} format / emoji {style.emoji ? 'allowed' : 'off'}</p>
               </div>
             </div>
-            <hr className="step-hr" />
-            <div className="done-next">
-              <h3 className="done-next-heading">What's next?</h3>
-              <ul className="next-steps">
-                <li>
-                  <strong>DM @gruv in Slack</strong> — start a conversation or set up a daily briefing
-                </li>
-                <li>
-                  <strong>Upload your Claude projects</strong> — drag files into{' '}
-                  <code>people/{userId}/claude-projects/</code> in the shared Drive
-                </li>
-                <li>
-                  <strong>Connect Granola</strong> — add your API key in Slack with{' '}
-                  <code>/gruv connect granola YOUR_KEY</code>
-                </li>
-              </ul>
-            </div>
-            <div className="step-actions">
-              <button onClick={prevStep} className="btn-ghost">&larr; Back</button>
-              <div style={{ flex: 1, textAlign: 'right' }}>
-                <p className="bookmark-hint">
-                  Bookmark:{' '}
-                  <a href={`/?id=${userId}`} className="inline-link">
-                    disco-agent-portal.vercel.app/?id={userId}
-                  </a>
-                </p>
+            <div className="connection-summary">
+              {(['google', 'github', 'granola'] as ServiceName[]).map((service) => (
+                <div key={service} className="summary-row">
+                  <span>{SERVICE_COPY[service].label}</span>
+                  <strong>{statusForService(service) ? 'Connected' : 'Skipped'}</strong>
+                </div>
+              ))}
+              <div className="summary-row">
+                <span>Slack</span>
+                <strong>{userId}</strong>
               </div>
+            </div>
+            <div className="decision-panel">
+              <div>
+                <p className="panel-kicker">Start using it</p>
+                <h3>Open Slack and DM @gruv</h3>
+              </div>
+              <p>
+                Ask for a briefing, request help with a PR, or have it summarize what needs your
+                attention today. Bookmark this setup link if you want to adjust preferences later.
+              </p>
+              <a href={`/?id=${userId}`} className="bookmark-link">
+                disco-agent-portal.vercel.app/?id={userId}
+              </a>
+            </div>
+            <div className="choice-row">
+              <button onClick={prevStep} className="btn-quiet">
+                Back
+              </button>
+              <button onClick={() => goTo('welcome')} className="btn-secondary">
+                Review setup
+              </button>
             </div>
           </div>
         );
@@ -558,303 +661,673 @@ export default function Home() {
     }
   };
 
-  // ── Render ──
   return (
     <>
-      <div className="app-root">
-        {/* Header */}
-        <header className="app-header">
-          <div className="header-left">
-            <span className="header-name">Disco Agent Portal</span>
+      <div className="app-shell">
+        <header className="topbar">
+          <div>
+            <p className="product-kicker">Disco Agent Portal</p>
+            <span>Agent onboarding</span>
           </div>
-          {userId && (
-            <div className="header-user">
-              <span>{userId}</span>
-            </div>
-          )}
+          {userId && <div className="user-chip">{userId}</div>}
         </header>
 
-        {/* Main layout: sidebar + content */}
-        <div className="main-layout">
-          {/* Sidebar with step navigation */}
-          <nav className="sidebar">
-            <div className="sidebar-label">Setup</div>
+        <main className="setup-layout">
+          <aside className="setup-rail" aria-label="Setup progress">
+            <div className="progress-card">
+              <div className="progress-copy">
+                <span>Setup progress</span>
+                <strong>{progress}%</strong>
+              </div>
+              <div className="progress-track">
+                <span style={{ width: `${progress}%` }} />
+              </div>
+            </div>
+
             <ol className="step-list">
-              {STEPS.map((s, i) => (
-                <li
-                  key={s.key}
-                  className={`step-item ${
-                    i < currentStepIndex
-                      ? 'step-done'
-                      : i === currentStepIndex
-                      ? 'step-current'
-                      : ''
-                  }`}
-                >
-                  <button
-                    onClick={() => {
-                      if (i <= currentStepIndex || STEPS.slice(0, i).every((ps) => {
-                        if (ps.key === 'slack') return !!userId;
-                        return true;
-                      })) {
-                        goTo(s.key);
-                      }
-                    }}
-                    className="step-link"
-                  >
-                    <span className="step-num">{s.num}.</span>
-                    <span className="step-label">{s.label}</span>
-                  </button>
-                </li>
-              ))}
+              {STEPS.map((item, index) => {
+                const isCurrent = item.key === step;
+                const isComplete = index < currentStepIndex || step === 'done';
+                const isLocked = !canOpenStep(index);
+
+                return (
+                  <li key={item.key}>
+                    <button
+                      onClick={() => !isLocked && goTo(item.key)}
+                      disabled={isLocked}
+                      className={`${isCurrent ? 'current' : ''} ${isComplete ? 'complete' : ''}`}
+                    >
+                      <span className="step-marker">{isComplete ? 'OK' : index + 1}</span>
+                      <span>
+                        <strong>{item.label}</strong>
+                        <small>{item.eyebrow}</small>
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
             </ol>
-          </nav>
+          </aside>
 
-          {/* Content area */}
-          <main className="content-area">
-            {/* Toast message */}
-            {message && (
-              <div className="toast">{message}</div>
-            )}
-
+          <section className="workspace">
+            {message && <div className="toast">{message}</div>}
+            <div className="step-header">
+              <p className="step-eyebrow">{currentStep.eyebrow}</p>
+              <h1>{currentStep.title}</h1>
+              <p>{currentStep.summary}</p>
+            </div>
+            <div className="explain-strip">
+              <div>
+                <span>Why this matters</span>
+                <p>{currentStep.why}</p>
+              </div>
+              <div>
+                <span>Outcome</span>
+                <p>{currentStep.outcome}</p>
+              </div>
+            </div>
             {renderStep()}
-          </main>
-        </div>
-
-        {/* Footer */}
-        <footer className="app-footer">
-          Disco Agent Portal
-        </footer>
+          </section>
+        </main>
       </div>
 
-      {/* ── Global styles ── */}
       <style jsx global>{`
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
         * {
           box-sizing: border-box;
-          margin: 0;
-          padding: 0;
+        }
+
+        html,
+        body,
+        #__next {
+          min-height: 100%;
         }
 
         body {
+          margin: 0;
           font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+          background: #f4f2ee;
+          color: #20211f;
+          font-size: 15px;
+          line-height: 1.5;
           -webkit-font-smoothing: antialiased;
           -moz-osx-font-smoothing: grayscale;
-          background: #ffffff;
-          color: #1a1a1a;
-          font-size: 15px;
-          line-height: 1.6;
+        }
+
+        button,
+        input {
+          font: inherit;
         }
       `}</style>
 
-      {/* ── Component styles ── */}
       <style jsx>{`
-        /* ── Root ── */
-        .app-root {
-          max-width: 900px;
-          margin: 0 auto;
-          padding: 40px 40px 60px;
+        .app-shell {
           min-height: 100vh;
-          background: #ffffff;
+          padding: 28px;
         }
 
-        @media (max-width: 768px) {
-          .app-root {
-            padding: 24px 20px 40px;
-          }
-        }
-
-        /* ── Header ── */
-        .app-header {
+        .topbar {
+          max-width: 1180px;
+          margin: 0 auto 18px;
           display: flex;
           align-items: center;
           justify-content: space-between;
-          margin-bottom: 40px;
-          padding-bottom: 16px;
-          border-bottom: 1px solid #e8e7e4;
-        }
-        .header-left {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-        }
-        .header-name {
-          font-family: Georgia, 'Times New Roman', serif;
-          font-size: 20px;
-          font-weight: 700;
-          color: #1a1a1a;
-          letter-spacing: -0.01em;
-        }
-        .header-user {
-          font-size: 12px;
-          color: #787774;
-          background: #f7f6f3;
-          border: 1px solid #e8e7e4;
-          border-radius: 4px;
-          padding: 4px 10px;
+          gap: 16px;
         }
 
-        /* ── Main layout ── */
-        .main-layout {
-          display: flex;
-          gap: 48px;
-        }
-
-        @media (max-width: 768px) {
-          .main-layout {
-            flex-direction: column;
-            gap: 24px;
-          }
-        }
-
-        /* ── Sidebar ── */
-        .sidebar {
-          width: 180px;
-          flex-shrink: 0;
-        }
-
-        @media (max-width: 768px) {
-          .sidebar {
-            width: 100%;
-          }
-        }
-
-        .sidebar-label {
-          font-family: Georgia, 'Times New Roman', serif;
-          font-size: 13px;
-          font-weight: 600;
-          color: #787774;
-          text-transform: uppercase;
-          letter-spacing: 0.06em;
-          margin-bottom: 12px;
-        }
-
-        .step-list {
-          list-style: none;
-          padding: 0;
+        .topbar div:first-child {
           display: flex;
           flex-direction: column;
           gap: 2px;
         }
 
-        @media (max-width: 768px) {
-          .step-list {
-            flex-direction: row;
-            flex-wrap: wrap;
-            gap: 4px;
-          }
+        .product-kicker,
+        .panel-kicker,
+        .step-eyebrow {
+          margin: 0;
+          color: #76736b;
+          font-size: 11px;
+          font-weight: 800;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
         }
 
-        .step-item {
+        .topbar span {
+          color: #20211f;
+          font-size: 18px;
+          font-weight: 800;
+        }
+
+        .user-chip {
+          border: 1px solid #d8d2c8;
+          background: #ffffff;
+          color: #4c4a45;
+          border-radius: 999px;
+          padding: 8px 12px;
+          font-size: 13px;
+          font-weight: 700;
+        }
+
+        .setup-layout {
+          max-width: 1180px;
+          margin: 0 auto;
+          display: grid;
+          grid-template-columns: minmax(240px, 300px) minmax(0, 1fr);
+          gap: 18px;
+          align-items: start;
+        }
+
+        .setup-rail,
+        .workspace {
+          background: #ffffff;
+          border: 1px solid #d8d2c8;
+          border-radius: 8px;
+          box-shadow: 0 18px 50px rgba(53, 47, 39, 0.08);
+        }
+
+        .setup-rail {
+          position: sticky;
+          top: 20px;
+          padding: 16px;
+        }
+
+        .workspace {
+          min-height: 680px;
+          padding: 34px;
+        }
+
+        .progress-card {
+          border-bottom: 1px solid #ebe6df;
+          padding-bottom: 16px;
+          margin-bottom: 14px;
+        }
+
+        .progress-copy {
+          display: flex;
+          justify-content: space-between;
+          color: #5c5850;
+          font-size: 13px;
+          margin-bottom: 10px;
+        }
+
+        .progress-copy strong {
+          color: #20211f;
+        }
+
+        .progress-track {
+          height: 8px;
+          background: #ece7de;
+          border-radius: 999px;
+          overflow: hidden;
+        }
+
+        .progress-track span {
+          display: block;
+          height: 100%;
+          background: #246b5f;
+          border-radius: inherit;
+          transition: width 180ms ease;
+        }
+
+        .step-list {
+          list-style: none;
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
           margin: 0;
           padding: 0;
         }
 
-        .step-link {
-          display: flex;
-          align-items: baseline;
-          gap: 6px;
-          padding: 5px 8px;
-          border: none;
-          background: none;
-          cursor: pointer;
-          font-family: inherit;
-          font-size: 14px;
-          color: #787774;
-          text-align: left;
+        .step-list button {
           width: 100%;
-          border-radius: 4px;
-          transition: background 0.1s;
+          display: grid;
+          grid-template-columns: 30px 1fr;
+          gap: 10px;
+          align-items: center;
+          border: 0;
+          background: transparent;
+          color: #5c5850;
+          text-align: left;
+          border-radius: 6px;
+          padding: 10px;
+          cursor: pointer;
         }
 
-        .step-link:hover {
-          background: #f7f6f3;
+        .step-list button:hover:not(:disabled),
+        .step-list button.current {
+          background: #f3f0ea;
+          color: #20211f;
         }
 
-        .step-num {
+        .step-list button:disabled {
+          cursor: not-allowed;
+          opacity: 0.45;
+        }
+
+        .step-marker {
+          width: 28px;
+          height: 28px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 50%;
+          border: 1px solid #d8d2c8;
+          background: #ffffff;
+          color: #76736b;
           font-size: 12px;
-          min-width: 20px;
-          color: #b9b7b0;
+          font-weight: 800;
         }
 
-        .step-label {
+        .step-list button.current .step-marker,
+        .step-list button.complete .step-marker {
+          background: #246b5f;
+          border-color: #246b5f;
+          color: #ffffff;
+        }
+
+        .step-list strong,
+        .step-list small {
+          display: block;
+        }
+
+        .step-list strong {
           font-size: 14px;
         }
 
-        .step-current .step-link {
-          color: #1a1a1a;
-          font-weight: 600;
-          background: #f7f6f3;
+        .step-list small {
+          color: #8b877e;
+          font-size: 12px;
+          margin-top: 1px;
         }
 
-        .step-current .step-num {
-          color: #1a1a1a;
-        }
-
-        .step-done .step-link {
-          color: #787774;
-        }
-
-        .step-done .step-num {
-          color: #9b9a94;
-        }
-
-        /* ── Content area ── */
-        .content-area {
-          flex: 1;
-          min-width: 0;
-        }
-
-        .step-content {
-          max-width: 520px;
-        }
-
-        /* ── Serif headings ── */
-        .serif-heading {
-          font-family: Georgia, 'Times New Roman', serif;
+        .toast {
+          border: 1px solid #b9d3cc;
+          background: #eef8f5;
+          color: #285a50;
+          border-radius: 6px;
+          padding: 10px 12px;
+          margin-bottom: 18px;
+          font-size: 13px;
           font-weight: 700;
-          color: #1a1a1a;
-          letter-spacing: -0.02em;
-          margin-bottom: 8px;
         }
 
-        h1.serif-heading {
-          font-size: 32px;
-          margin-bottom: 12px;
+        .step-header {
+          max-width: 740px;
+          margin-bottom: 22px;
         }
 
-        h2.serif-heading {
-          font-size: 26px;
+        .step-header h1 {
+          margin: 8px 0 12px;
+          color: #20211f;
+          font-size: 42px;
+          line-height: 1.04;
+          letter-spacing: 0;
         }
 
-        @media (max-width: 768px) {
-          h1.serif-heading { font-size: 26px; }
-          h2.serif-heading { font-size: 22px; }
+        .step-header p:last-child {
+          margin: 0;
+          color: #5c5850;
+          font-size: 17px;
+          max-width: 680px;
         }
 
-        /* ── Step description ── */
-        .step-description {
-          font-size: 15px;
-          color: #5a5955;
-          line-height: 1.7;
-          margin-bottom: 8px;
+        .explain-strip {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 1px;
+          overflow: hidden;
+          border: 1px solid #e3ddd3;
+          border-radius: 8px;
+          background: #e3ddd3;
+          margin-bottom: 28px;
         }
 
-        /* ── Horizontal rule ── */
-        .step-hr {
-          border: none;
-          border-top: 1px solid #e8e7e4;
-          margin: 20px 0;
+        .explain-strip div {
+          background: #fbfaf8;
+          padding: 18px;
         }
 
-        /* ── Step body ── */
-        .step-body {
-          margin-bottom: 24px;
+        .explain-strip span {
+          color: #76736b;
+          display: block;
+          font-size: 12px;
+          font-weight: 800;
+          margin-bottom: 6px;
         }
 
-        /* ── Step actions ── */
-        .step-actions {
+        .explain-strip p {
+          margin: 0;
+          color: #4c4a45;
+        }
+
+        .section-stack {
+          display: flex;
+          flex-direction: column;
+          gap: 18px;
+        }
+
+        .intro-grid,
+        .summary-grid {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 14px;
+        }
+
+        .intro-grid > div,
+        .summary-block,
+        .decision-panel,
+        .form-block,
+        .connection-summary {
+          border: 1px solid #e3ddd3;
+          border-radius: 8px;
+          background: #fbfaf8;
+          padding: 18px;
+        }
+
+        .intro-grid h3,
+        .summary-block h3,
+        .decision-panel h3 {
+          margin: 6px 0 8px;
+          color: #20211f;
+          font-size: 18px;
+        }
+
+        .intro-grid p,
+        .summary-block p,
+        .decision-panel p,
+        .fine-print {
+          margin: 0;
+          color: #5c5850;
+        }
+
+        .flow-preview {
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 10px;
+        }
+
+        .flow-item {
+          border-left: 3px solid #246b5f;
+          background: #f5f2ec;
+          border-radius: 6px;
+          padding: 12px;
+        }
+
+        .flow-item span,
+        .flow-item small {
+          display: block;
+        }
+
+        .flow-item span {
+          color: #20211f;
+          font-weight: 800;
+        }
+
+        .flow-item small {
+          color: #76736b;
+          margin-top: 2px;
+        }
+
+        .decision-panel {
+          display: grid;
+          gap: 14px;
+        }
+
+        .check-list {
+          margin: 0;
+          padding: 0;
+          list-style: none;
+          display: grid;
+          gap: 8px;
+        }
+
+        .check-list li {
+          position: relative;
+          color: #4c4a45;
+          padding-left: 24px;
+        }
+
+        .check-list li::before {
+          content: '';
+          position: absolute;
+          left: 0;
+          top: 8px;
+          width: 8px;
+          height: 8px;
+          border-radius: 50%;
+          background: #246b5f;
+        }
+
+        .fine-print {
+          color: #76736b;
+          font-size: 13px;
+        }
+
+        .connect-button {
+          width: 100%;
+          border: 1px solid #cfc7bb;
+          background: #ffffff;
+          color: #20211f;
+          border-radius: 8px;
+          padding: 16px 18px;
+          text-decoration: none;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          cursor: pointer;
+          font-weight: 800;
+        }
+
+        .connect-button:hover {
+          border-color: #246b5f;
+          box-shadow: inset 0 0 0 1px #246b5f;
+        }
+
+        .button-detail {
+          color: #76736b;
+          font-size: 13px;
+          font-weight: 700;
+        }
+
+        .identity-options {
+          display: grid;
+          gap: 12px;
+        }
+
+        .manual-entry,
+        .field {
+          display: grid;
+          gap: 6px;
+        }
+
+        .field-label {
+          color: #20211f;
+          font-size: 12px;
+          font-weight: 800;
+          letter-spacing: 0.06em;
+          text-transform: uppercase;
+        }
+
+        .field-hint {
+          margin: 0;
+          color: #76736b;
+          font-size: 13px;
+        }
+
+        .text-input {
+          width: 100%;
+          border: 1px solid #cfc7bb;
+          background: #ffffff;
+          color: #20211f;
+          border-radius: 6px;
+          padding: 12px 13px;
+          outline: none;
+        }
+
+        .text-input:focus {
+          border-color: #246b5f;
+          box-shadow: 0 0 0 3px rgba(36, 107, 95, 0.14);
+        }
+
+        .state-row {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          border: 1px solid #d7e6df;
+          background: #f1faf6;
+          color: #285a50;
+          border-radius: 8px;
+          padding: 14px 16px;
+          font-weight: 700;
+        }
+
+        .state-dot {
+          width: 10px;
+          height: 10px;
+          border-radius: 50%;
+          background: #246b5f;
+        }
+
+        .profile-grid {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 14px;
+        }
+
+        .profile-grid .field:last-child {
+          grid-column: 1 / -1;
+        }
+
+        .preference-stack {
+          display: grid;
+          gap: 12px;
+        }
+
+        .preference-row,
+        .toggle-row {
+          border: 1px solid #e3ddd3;
+          border-radius: 8px;
+          background: #fbfaf8;
+          padding: 16px;
+        }
+
+        .preference-row {
+          display: grid;
+          grid-template-columns: minmax(160px, 1fr) auto;
+          gap: 16px;
+          align-items: center;
+        }
+
+        .segmented-control {
+          display: inline-flex;
+          border: 1px solid #cfc7bb;
+          border-radius: 7px;
+          padding: 3px;
+          background: #ffffff;
+        }
+
+        .segmented-control button {
+          border: 0;
+          background: transparent;
+          color: #5c5850;
+          border-radius: 5px;
+          padding: 8px 11px;
+          cursor: pointer;
+          font-size: 13px;
+          font-weight: 800;
+        }
+
+        .segmented-control button.selected {
+          background: #246b5f;
+          color: #ffffff;
+        }
+
+        .toggle-row {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          cursor: pointer;
+        }
+
+        .toggle-row input {
+          position: absolute;
+          opacity: 0;
+          pointer-events: none;
+        }
+
+        .toggle-track {
+          width: 42px;
+          height: 24px;
+          border-radius: 999px;
+          background: #cfc7bb;
+          padding: 3px;
+          transition: background 160ms ease;
+        }
+
+        .toggle-thumb {
+          display: block;
+          width: 18px;
+          height: 18px;
+          background: #ffffff;
+          border-radius: 50%;
+          transition: transform 160ms ease;
+        }
+
+        .toggle-row input:checked + .toggle-track {
+          background: #246b5f;
+        }
+
+        .toggle-row input:checked + .toggle-track .toggle-thumb {
+          transform: translateX(18px);
+        }
+
+        .toggle-row strong,
+        .toggle-row small {
+          display: block;
+        }
+
+        .toggle-row small {
+          color: #76736b;
+          margin-top: 2px;
+        }
+
+        .connection-summary {
+          display: grid;
+          gap: 0;
+          padding: 0;
+          overflow: hidden;
+        }
+
+        .summary-row {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 18px;
+          padding: 14px 16px;
+          border-bottom: 1px solid #e8e2d9;
+        }
+
+        .summary-row:last-child {
+          border-bottom: 0;
+        }
+
+        .summary-row span {
+          color: #5c5850;
+        }
+
+        .summary-row strong {
+          color: #20211f;
+        }
+
+        .bookmark-link {
+          color: #246b5f;
+          font-weight: 800;
+          word-break: break-word;
+        }
+
+        .choice-row {
           display: flex;
           align-items: center;
           justify-content: space-between;
@@ -862,399 +1335,147 @@ export default function Home() {
           padding-top: 4px;
         }
 
-        /* ── Buttons ── */
-        .btn-primary {
-          display: inline-flex;
+        .choice-actions {
+          display: flex;
           align-items: center;
-          gap: 4px;
-          padding: 8px 20px;
-          border: 1px solid #1a1a1a;
-          border-radius: 4px;
-          font-size: 14px;
-          font-weight: 500;
+          gap: 10px;
+        }
+
+        .microcopy {
+          color: #76736b;
+          font-size: 13px;
+        }
+
+        .btn-primary,
+        .btn-secondary,
+        .btn-quiet,
+        .btn-text {
+          border-radius: 6px;
           cursor: pointer;
-          font-family: inherit;
-          background: #1a1a1a;
+          font-weight: 800;
+          min-height: 42px;
+          padding: 0 16px;
+        }
+
+        .btn-primary {
+          border: 1px solid #246b5f;
+          background: #246b5f;
           color: #ffffff;
-          transition: background 0.15s, opacity 0.15s;
         }
+
         .btn-primary:hover {
-          background: #333333;
+          background: #1e5a50;
         }
-        .btn-primary:disabled {
-          opacity: 0.35;
+
+        .btn-primary:disabled,
+        .btn-secondary:disabled {
+          opacity: 0.45;
           cursor: not-allowed;
         }
 
-        .btn-ghost {
-          padding: 8px 16px;
-          border: none;
-          border-radius: 4px;
-          background: transparent;
-          color: #787774;
-          font-size: 14px;
-          font-weight: 500;
-          cursor: pointer;
-          font-family: inherit;
-          transition: color 0.15s, background 0.15s;
-        }
-        .btn-ghost:hover {
-          color: #1a1a1a;
-          background: #f7f6f3;
-        }
-
-        /* ── OAuth buttons ── */
-        .oauth-btn {
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          gap: 8px;
-          padding: 10px 20px;
-          border: 1px solid #e8e7e4;
-          border-radius: 4px;
-          background: #f7f6f3;
-          color: #1a1a1a;
-          font-size: 14px;
-          font-weight: 500;
-          cursor: pointer;
-          text-decoration: none;
-          font-family: inherit;
-          transition: background 0.15s;
-          width: 100%;
-        }
-        .oauth-btn:hover {
-          background: #eeedeb;
-        }
-
-        /* ── Or divider ── */
-        .or-divider {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          margin: 16px 0;
-          font-size: 12px;
-          color: #b9b7b0;
-        }
-        .or-divider::before,
-        .or-divider::after {
-          content: '';
-          flex: 1;
-          height: 1px;
-          background: #e8e7e4;
-        }
-
-        /* ── Input ── */
-        .input-group {
-          margin-top: 4px;
-        }
-        .text-input {
-          width: 100%;
-          padding: 10px 14px;
-          border-radius: 4px;
-          border: 1px solid #e8e7e4;
+        .btn-secondary {
+          border: 1px solid #cfc7bb;
           background: #ffffff;
-          color: #1a1a1a;
-          font-size: 14px;
-          font-family: inherit;
-          outline: none;
-          transition: border-color 0.15s, box-shadow 0.15s;
-        }
-        .text-input:focus {
-          border-color: #1a1a1a;
-          box-shadow: 0 0 0 2px rgba(26,26,26,0.06);
-        }
-        .text-input::placeholder {
-          color: #b9b7b0;
-        }
-        .input-hint {
-          font-size: 12px;
-          color: #b9b7b0;
-          margin-top: 8px;
-        }
-        .input-hint strong {
-          color: #787774;
+          color: #20211f;
         }
 
-        /* ── Connected indicator ── */
-        .connected-row {
-          display: inline-flex;
-          align-items: center;
-          gap: 8px;
-          padding: 10px 16px;
-          background: #f7f6f3;
-          border: 1px solid #e8e7e4;
-          border-radius: 4px;
-          font-size: 14px;
-          color: #5a5955;
-        }
-        .connected-indicator {
-          width: 7px;
-          height: 7px;
-          border-radius: 50%;
-          background: #1a1a1a;
-          flex-shrink: 0;
-        }
-        .connected-indicator.green {
-          background: #2b9348;
+        .btn-secondary:hover,
+        .btn-quiet:hover,
+        .btn-text:hover {
+          background: #f3f0ea;
         }
 
-        /* ── Permission list ── */
-        .perm-list {
-          list-style: none;
-          margin-top: 16px;
-          padding: 0;
-          display: flex;
-          flex-direction: column;
-          gap: 4px;
-        }
-        .perm-list li {
-          font-size: 13px;
-          color: #787774;
-          padding: 6px 0;
+        .btn-quiet,
+        .btn-text {
+          border: 1px solid transparent;
+          background: transparent;
+          color: #5c5850;
         }
 
-        /* ── Setup instructions (GitHub) ── */
-        .setup-instructions {
-          margin-top: 16px;
-          padding: 14px 16px;
-          background: #f7f6f3;
-          border: 1px solid #e8e7e4;
-          border-radius: 4px;
-        }
-        .setup-title {
-          font-family: Georgia, 'Times New Roman', serif;
-          font-size: 13px;
-          font-weight: 600;
-          color: #1a1a1a;
-          margin-bottom: 6px;
-        }
-        .setup-instructions p {
-          font-size: 13px;
-          color: #5a5955;
-          line-height: 1.6;
-        }
-        .setup-instructions a {
-          color: #1a1a1a;
-          text-decoration: underline;
-          text-underline-offset: 2px;
-        }
-        .setup-instructions code {
-          font-size: 12px;
-          background: #e8e7e4;
-          padding: 1px 5px;
-          border-radius: 3px;
-          font-family: 'SF Mono', 'Menlo', monospace;
-          word-break: break-all;
+        .btn-text {
+          color: #246b5f;
         }
 
-        /* ── Profile grid ── */
-        .profile-grid {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 18px;
-        }
-        @media (max-width: 640px) {
-          .profile-grid {
+        @media (max-width: 900px) {
+          .app-shell {
+            padding: 18px;
+          }
+
+          .setup-layout {
             grid-template-columns: 1fr;
           }
-        }
-        .field {
-          display: flex;
-          flex-direction: column;
-        }
-        .field-label {
-          font-size: 12px;
-          font-weight: 600;
-          color: #1a1a1a;
-          text-transform: uppercase;
-          letter-spacing: 0.04em;
-          margin-bottom: 2px;
-          font-family: Georgia, 'Times New Roman', serif;
-        }
-        .field-hint {
-          font-size: 12px;
-          color: #b9b7b0;
-          margin-bottom: 6px;
-          line-height: 1.4;
+
+          .setup-rail {
+            position: static;
+          }
+
+          .step-list {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+          }
+
+          .workspace {
+            min-height: 0;
+          }
         }
 
-        /* ── Style grid ── */
-        .style-grid {
-          display: flex;
-          flex-direction: column;
-          gap: 20px;
-        }
-        .pill-group {
-          display: flex;
-          gap: 6px;
-          flex-wrap: wrap;
-        }
-        .pill {
-          padding: 6px 16px;
-          border-radius: 4px;
-          border: 1px solid #e8e7e4;
-          background: #ffffff;
-          color: #5a5955;
-          font-size: 13px;
-          font-weight: 500;
-          cursor: pointer;
-          transition: all 0.15s;
-          font-family: inherit;
-        }
-        .pill:hover {
-          background: #f7f6f3;
-          color: #1a1a1a;
-        }
-        .pill.active {
-          background: #1a1a1a;
-          border-color: #1a1a1a;
-          color: #ffffff;
-        }
+        @media (max-width: 680px) {
+          .app-shell {
+            padding: 12px;
+          }
 
-        /* ── Checkbox ── */
-        .checkbox-label {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          cursor: pointer;
-          font-size: 14px;
-          color: #5a5955;
-          user-select: none;
-        }
-        .checkbox-label input {
-          display: none;
-        }
-        .checkbox-custom {
-          width: 16px;
-          height: 16px;
-          border-radius: 3px;
-          border: 1px solid #e8e7e4;
-          background: #ffffff;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          transition: all 0.15s;
-          flex-shrink: 0;
-        }
-        .checkbox-label input:checked + .checkbox-custom {
-          background: #1a1a1a;
-          border-color: #1a1a1a;
-        }
-        .checkbox-label input:checked + .checkbox-custom::after {
-          content: '';
-          width: 4px;
-          height: 7px;
-          border: solid #ffffff;
-          border-width: 0 2px 2px 0;
-          transform: rotate(45deg);
-          margin-top: -1px;
-        }
+          .topbar {
+            align-items: flex-start;
+            flex-direction: column;
+          }
 
-        /* ── Feature list (welcome) ── */
-        .feature-list {
-          display: flex;
-          flex-direction: column;
-          gap: 8px;
-          margin-bottom: 24px;
-        }
-        .feature-item {
-          display: flex;
-          align-items: baseline;
-          gap: 8px;
-          font-size: 14px;
-          color: #5a5955;
-        }
-        .feature-icon {
-          font-size: 13px;
-          font-weight: 600;
-          color: #787774;
-          min-width: 20px;
-        }
+          .workspace {
+            padding: 22px;
+          }
 
-        /* ── Done step ── */
-        .done-summary {
-          margin-bottom: 8px;
-        }
-        .done-summary-heading,
-        .done-next-heading {
-          font-family: Georgia, 'Times New Roman', serif;
-          font-size: 14px;
-          font-weight: 600;
-          color: #1a1a1a;
-          margin-bottom: 10px;
-        }
-        .summary-list {
-          display: flex;
-          flex-direction: column;
-          gap: 6px;
-        }
-        .summary-row {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-          font-size: 14px;
-        }
-        .summary-label {
-          color: #5a5955;
-          min-width: 70px;
-        }
-        .summary-status {
-          color: #b9b7b0;
-        }
-        .done-next {
-          margin-bottom: 4px;
-        }
-        .next-steps {
-          list-style: none;
-          padding: 0;
-          display: flex;
-          flex-direction: column;
-          gap: 8px;
-        }
-        .next-steps li {
-          font-size: 14px;
-          color: #5a5955;
-          line-height: 1.7;
-          padding-left: 16px;
-          border-left: 2px solid #e8e7e4;
-        }
-        .next-steps li strong {
-          color: #1a1a1a;
-        }
-        .next-steps li code {
-          font-size: 12px;
-          background: #f7f6f3;
-          padding: 1px 5px;
-          border-radius: 3px;
-          font-family: 'SF Mono', 'Menlo', monospace;
-        }
-        .bookmark-hint {
-          font-size: 12px;
-          color: #b9b7b0;
-        }
-        .inline-link {
-          color: #1a1a1a;
-        }
+          .step-header h1 {
+            font-size: 32px;
+          }
 
-        /* ── Toast ── */
-        .toast {
-          background: #f7f6f3;
-          border: 1px solid #e8e7e4;
-          border-radius: 4px;
-          padding: 8px 14px;
-          margin-bottom: 16px;
-          font-size: 13px;
-          color: #5a5955;
-        }
+          .explain-strip,
+          .intro-grid,
+          .summary-grid,
+          .profile-grid,
+          .preference-row {
+            grid-template-columns: 1fr;
+          }
 
-        /* ── Footer ── */
-        .app-footer {
-          margin-top: 60px;
-          padding-top: 16px;
-          border-top: 1px solid #e8e7e4;
-          font-size: 12px;
-          color: #b9b7b0;
-          text-align: center;
+          .flow-preview,
+          .step-list {
+            grid-template-columns: 1fr;
+          }
+
+          .choice-row,
+          .choice-actions {
+            align-items: stretch;
+            flex-direction: column;
+          }
+
+          .choice-row > *,
+          .choice-actions,
+          .choice-actions > *,
+          .btn-primary,
+          .btn-secondary,
+          .btn-quiet,
+          .btn-text {
+            width: 100%;
+          }
+
+          .segmented-control {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            width: 100%;
+          }
+
+          .segmented-control button {
+            padding-left: 6px;
+            padding-right: 6px;
+          }
         }
       `}</style>
     </>
