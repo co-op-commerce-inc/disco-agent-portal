@@ -9,13 +9,22 @@ const WEBHOOK_BASE = 'https://dias-mac-studio.tail4f36cb.ts.net/webhooks';
 
 const STEPS = [
   {
+    key: 'splash',
+    label: 'Meet Stu',
+    eyebrow: 'AI agent',
+    title: 'Stu is your always-on work agent',
+    summary: 'A neon-bright AI workspace for Slack, Drive, Claude Code projects, meetings, and code context.',
+    why: 'Stu works best when onboarding feels like activating a real teammate: identity first, context next, then a personal workspace for the artifacts he will use.',
+    outcome: 'You will create a named workspace, import project folders, and teach Stu how to help you.',
+  },
+  {
     key: 'welcome',
-    label: 'Overview',
-    eyebrow: 'Start here',
-    title: 'Set up your Disco agent',
-    summary: 'Create the profile your agent will use in Slack, meetings, code reviews, and daily work.',
-    why: 'A useful agent needs identity, context, and preferences before it can help without constantly asking follow-up questions.',
-    outcome: 'You will know what is being connected, why it matters, and what the agent can do next.',
+    label: 'Setup plan',
+    eyebrow: 'What Stu needs',
+    title: 'Give Stu the context to actually work',
+    summary: 'This flow connects your identity, services, personal Drive workspace, Claude Code folders, and response preferences.',
+    why: 'A useful AI agent needs the same operating context you use every day: messages, calendars, code, docs, meetings, and project folders.',
+    outcome: 'You will know exactly what Stu is setting up and where your project materials should live.',
   },
   {
     key: 'slack',
@@ -30,10 +39,19 @@ const STEPS = [
     key: 'google',
     label: 'Google',
     eyebrow: 'Recommended',
-    title: 'Give the agent schedule and inbox context',
-    summary: 'Connect Google so the agent can help with calendar questions, meeting prep, email summaries, and Drive context.',
+    title: 'Give Stu schedule, inbox, and Drive context',
+    summary: 'Connect Google so Stu can help with calendar questions, meeting prep, email summaries, Drive files, and workspace creation.',
     why: 'Calendar and email are usually where commitments, blockers, and follow-ups first appear.',
-    outcome: 'The agent can reason over the Google access you approve.',
+    outcome: 'Stu can reason over the Google access you approve and prepare your Drive workspace.',
+  },
+  {
+    key: 'workspace',
+    label: 'Drive workspace',
+    eyebrow: 'Projects',
+    title: 'Create your personal Stu workspace',
+    summary: 'Stu creates a Google Drive folder with your name and a Claude Code Projects area so you can drag project folders into one predictable place.',
+    why: 'Claude Code project context should not be hidden in random exports. Stu needs a stable home for folders, briefs, docs, and source snapshots.',
+    outcome: 'You get a named Drive workspace and can upload Claude Code project folders for Stu to index.',
   },
   {
     key: 'github',
@@ -75,10 +93,10 @@ const STEPS = [
     key: 'done',
     label: 'Ready',
     eyebrow: 'Complete',
-    title: 'Your agent profile is ready',
-    summary: 'Review what is connected, what was skipped, and how to start using the agent in Slack.',
+    title: 'Stu is ready to work with you',
+    summary: 'Review what is connected, where your Drive workspace lives, and how to start using Stu in Slack.',
     why: 'A clean handoff makes the setup feel finished and gives you a place to return when preferences change.',
-    outcome: 'DM the agent in Slack and come back here anytime to adjust setup.',
+    outcome: 'DM Stu in Slack and come back here anytime to adjust setup or add more project folders.',
   },
 ] as const;
 
@@ -102,7 +120,7 @@ const SERVICES: Record<
     benefits: [
       'Find open time and understand calendar conflicts',
       'Summarize email threads and identify follow-ups',
-      'Use Drive files when project context matters',
+      'Create and use your named Stu Drive workspace',
     ],
     permission: 'You approve the exact Google scopes in the consent window.',
   },
@@ -206,12 +224,21 @@ const STYLE_FIELDS: Array<{
 export default function Home() {
   const [userId, setUserId] = useState(() => getUrlParam('id') || getUrlParam('userId') || '');
   const [userName] = useState(() => getUrlParam('name') || '');
-  const [step, setStep] = useState<StepKey>('welcome');
+  const [step, setStep] = useState<StepKey>('splash');
   const [services, setServices] = useState<Record<string, boolean>>({});
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [granolaKey, setGranolaKey] = useState('');
   const [granolaSaved, setGranolaSaved] = useState(false);
+  const [driveWorkspace, setDriveWorkspace] = useState({
+    created: false,
+    folderName: '',
+    folderUrl: '',
+  });
+  const [projectUpload, setProjectUpload] = useState({
+    uploaded: 0,
+    status: '',
+  });
   const [profile, setProfile] = useState<Record<ProfileKey, string>>({
     role: '',
     team: '',
@@ -269,13 +296,13 @@ export default function Home() {
   const canOpenStep = (index: number) => {
     if (index <= currentIndex) return true;
     if (STEPS[index].key === 'done') return step === 'done';
-    if (!userId && STEPS[index].key !== 'slack') return false;
+    if (!userId && !['splash', 'welcome', 'slack'].includes(STEPS[index].key)) return false;
     return true;
   };
 
   const connectOAuth = (service: ServiceName) => {
     if (!userId) {
-      setMessage('Add your Slack identity first so this connection can be saved to the right profile.');
+      setMessage('Add your Slack identity first so Stu can save this connection to the right profile.');
       goTo('slack');
       return;
     }
@@ -297,7 +324,7 @@ export default function Home() {
   const saveGranolaKey = async () => {
     if (!granolaKey.trim()) return;
     if (!userId) {
-      setMessage('Add your Slack identity first so the Granola key is saved to the right profile.');
+      setMessage('Add your Slack identity first so Stu can save the Granola key to the right profile.');
       goTo('slack');
       return;
     }
@@ -322,6 +349,86 @@ export default function Home() {
     setLoading(false);
   };
 
+  const createDriveWorkspace = async () => {
+    if (!userId) {
+      setMessage('Add your Slack identity first so Stu can name the Drive workspace correctly.');
+      goTo('slack');
+      return;
+    }
+    if (!serviceConnected('google')) {
+      setMessage('Connect Google first so Stu can create your Drive workspace.');
+      goTo('google');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await fetch('/api/workspace', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId,
+          displayName: userName || profile.role || userId,
+        }),
+      });
+      const payload = await response.json();
+
+      if (!response.ok) {
+        throw new Error(payload.error || 'Workspace creation failed');
+      }
+
+      setDriveWorkspace({
+        created: true,
+        folderName: payload.folderName || `${userName || userId} - Stu Workspace`,
+        folderUrl: payload.folderUrl || payload.url || '',
+      });
+      setMessage('Stu workspace created in Google Drive.');
+    } catch (error: any) {
+      setMessage(error.message || 'Stu could not create the Drive workspace yet.');
+    }
+    setLoading(false);
+  };
+
+  const uploadClaudeProjects = async (fileList: FileList | null) => {
+    if (!fileList || fileList.length === 0) return;
+    if (!userId) {
+      setMessage('Add your Slack identity first so project files can be attached to your profile.');
+      goTo('slack');
+      return;
+    }
+
+    setProjectUpload({ uploaded: 0, status: 'Uploading project files...' });
+    const formData = new FormData();
+    formData.append('userId', userId);
+    Array.from(fileList).forEach((file) => {
+      const relativePath = (file as File & { webkitRelativePath?: string }).webkitRelativePath;
+      formData.append('files', file, relativePath || file.name);
+    });
+
+    try {
+      const response = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
+      const payload = await response.json();
+
+      if (!response.ok) {
+        throw new Error(payload.error || 'Upload failed');
+      }
+
+      const uploaded = Array.isArray(payload.results) ? payload.results.length : fileList.length;
+      setProjectUpload({
+        uploaded,
+        status: `${uploaded} file${uploaded === 1 ? '' : 's'} sent to Stu for Drive storage.`,
+      });
+    } catch (error: any) {
+      setProjectUpload({
+        uploaded: 0,
+        status: error.message || 'Project upload failed.',
+      });
+    }
+  };
+
   const submitOnboarding = async () => {
     setLoading(true);
     try {
@@ -335,6 +442,8 @@ export default function Home() {
           ...profile,
           ...style,
           services,
+          driveWorkspace,
+          claudeProjectsUploaded: projectUpload.uploaded,
         }),
       });
       setMessage('Profile saved.');
@@ -345,6 +454,38 @@ export default function Home() {
     goTo('done');
   };
 
+  const renderSplash = () => (
+    <div className="splash">
+      <section className="splash-card">
+        <div className="splash-copy">
+          <span>Meet Stu</span>
+          <h2>Your AI work double for the stuff that gets scattered.</h2>
+          <p>
+            Stu connects Slack, Google Drive, GitHub, Granola, and Claude Code project folders so
+            your work context has one place to land.
+          </p>
+          <div className="ai-signal-grid">
+            <div>
+              <strong>AI memory</strong>
+              <small>Docs, meetings, code, and Slack identity</small>
+            </div>
+            <div>
+              <strong>Drive workspace</strong>
+              <small>A named folder for your project materials</small>
+            </div>
+            <div>
+              <strong>Claude Code import</strong>
+              <small>Drag folders in for Stu to index</small>
+            </div>
+          </div>
+        </div>
+        <div className="stu-orb">
+          <img src="/stu-logo.png" alt="Stu" />
+        </div>
+      </section>
+    </div>
+  );
+
   const renderWelcome = () => (
     <div className="stack">
       <div className="overview-grid">
@@ -352,17 +493,22 @@ export default function Home() {
           {
             label: 'Identity',
             title: 'Start with Slack',
-            body: 'The agent needs a Slack member ID before it can save service connections and preferences.',
+            body: 'Stu needs your Slack member ID before he can save connections and respond as your agent.',
           },
           {
-            label: 'Context',
-            title: 'Connect what matters',
-            body: 'Google, GitHub, and Granola are optional but make the agent more aware of your work.',
+            label: 'Workspace',
+            title: 'Create your Drive home',
+            body: 'Stu creates a named Google Drive workspace and a Claude Code Projects folder.',
+          },
+          {
+            label: 'Project memory',
+            title: 'Bring Claude Code in',
+            body: 'Drag project folders into the portal so Stu can preserve useful context.',
           },
           {
             label: 'Behavior',
             title: 'Tune the defaults',
-            body: 'Set role context and response style once, then adjust later as the agent learns your workflow.',
+            body: 'Set role context and response style once, then adjust later as Stu learns your workflow.',
           },
         ].map((item) => (
           <article key={item.label} className="intro-tile">
@@ -374,7 +520,7 @@ export default function Home() {
       </div>
 
       <div className="timeline">
-        {STEPS.slice(1, -1).map((item, index) => (
+        {STEPS.slice(2, -1).map((item, index) => (
           <div key={item.key} className="timeline-item">
             <span>{index + 1}</span>
             <div>
@@ -501,6 +647,84 @@ export default function Home() {
     );
   };
 
+  const renderWorkspace = () => {
+    const displayName = userName || userId || 'Your name';
+    const folderName = driveWorkspace.folderName || `${displayName} - Stu Workspace`;
+
+    return (
+      <div className="stack">
+        <section className="setup-section workspace-panel">
+          <div className="section-heading">
+            <span>Drive workspace</span>
+            <h2>{folderName}</h2>
+            <p>
+              Stu creates this folder in Google Drive, then stores Claude Code project exports under
+              <strong> Claude Code Projects</strong>.
+            </p>
+          </div>
+
+          <div className="workspace-map">
+            <div className="folder-card root-folder">
+              <span>Drive</span>
+              <strong>{folderName}</strong>
+            </div>
+            <div className="folder-card">
+              <span>Folder</span>
+              <strong>Claude Code Projects</strong>
+            </div>
+            <div className="folder-card">
+              <span>Folder</span>
+              <strong>Meeting notes and briefs</strong>
+            </div>
+            <div className="folder-card">
+              <span>Folder</span>
+              <strong>Uploads from Stu</strong>
+            </div>
+          </div>
+
+          <div className="workspace-actions">
+            {driveWorkspace.created ? (
+              <div className="connected-banner">
+                <span />
+                <div>
+                  <strong>Drive workspace created</strong>
+                  <p>{driveWorkspace.folderUrl || folderName}</p>
+                </div>
+              </div>
+            ) : (
+              <button className="button primary" onClick={createDriveWorkspace} disabled={loading || !userId}>
+                {loading ? 'Creating workspace...' : 'Create my Drive workspace'}
+              </button>
+            )}
+          </div>
+        </section>
+
+        <section className="setup-section">
+          <div className="section-heading">
+            <span>Claude Code projects</span>
+            <h2>Drag project folders here</h2>
+            <p>
+              Select a Claude Code project folder or drop exported project files. Stu sends them to
+              your Drive workspace so they can become searchable context.
+            </p>
+          </div>
+
+          <label className="drop-zone">
+            <input
+              type="file"
+              multiple
+              onChange={(event) => uploadClaudeProjects(event.target.files)}
+              {...{ webkitdirectory: 'true', directory: 'true' }}
+            />
+            <span>Drop folders or choose Claude Code projects</span>
+            <strong>Destination: {folderName} / Claude Code Projects</strong>
+            <small>{projectUpload.status || 'Folders, markdown, JSON, code, and notes are supported.'}</small>
+          </label>
+        </section>
+      </div>
+    );
+  };
+
   const renderProfile = () => (
     <div className="stack">
       <section className="setup-section">
@@ -588,6 +812,8 @@ export default function Home() {
         <div className="summary-list">
           <SummaryRow label="Slack" value={userId || 'Not set'} />
           <SummaryRow label="Google" value={serviceConnected('google') ? 'Connected' : 'Skipped'} />
+          <SummaryRow label="Drive workspace" value={driveWorkspace.created ? 'Created' : 'Not created'} />
+          <SummaryRow label="Claude projects" value={projectUpload.uploaded ? `${projectUpload.uploaded} files uploaded` : 'Not uploaded'} />
           <SummaryRow label="GitHub" value={serviceConnected('github') ? 'Connected' : 'Skipped'} />
           <SummaryRow label="Granola" value={serviceConnected('granola') ? 'Connected' : 'Skipped'} />
           <SummaryRow label="Role" value={profile.role || 'Not set'} />
@@ -598,7 +824,7 @@ export default function Home() {
       <section className="setup-section action-panel">
         <div>
           <span>Next</span>
-          <h2>DM @gruv in Slack</h2>
+          <h2>DM Stu in Slack</h2>
           <p>Ask for a briefing, a PR summary, meeting follow-ups, or help finding what needs attention.</p>
         </div>
         <a href={`/?id=${userId}`} className="return-link">
@@ -610,12 +836,16 @@ export default function Home() {
 
   const renderStep = () => {
     switch (step) {
+      case 'splash':
+        return renderSplash();
       case 'welcome':
         return renderWelcome();
       case 'slack':
         return renderSlack();
       case 'google':
         return renderService('google');
+      case 'workspace':
+        return renderWorkspace();
       case 'github':
         return renderService('github');
       case 'granola':
@@ -638,6 +868,7 @@ export default function Home() {
   };
 
   const primaryLabel = () => {
+    if (step === 'splash') return 'Start with Stu';
     if (step === 'welcome') return 'Begin setup';
     if (step === 'style') return loading ? 'Saving...' : 'Finish setup';
     if (step === 'done') return 'Review setup';
@@ -655,10 +886,10 @@ export default function Home() {
       <div className="app">
         <aside className="rail">
           <div className="brand">
-            <div className="brand-mark">D</div>
+            <img className="brand-logo" src="/stu-logo.png" alt="Stu" />
             <div>
-              <strong>Disco Agent</strong>
-              <span>Onboarding</span>
+              <strong>Stu</strong>
+              <span>AI agent onboarding</span>
             </div>
           </div>
 
@@ -734,6 +965,8 @@ export default function Home() {
               <div>
                 <span>Connections</span>
                 <ConnectionLine label="Google" connected={serviceConnected('google')} />
+                <ConnectionLine label="Drive workspace" connected={driveWorkspace.created} />
+                <ConnectionLine label="Claude projects" connected={projectUpload.uploaded > 0} />
                 <ConnectionLine label="GitHub" connected={serviceConnected('github')} />
                 <ConnectionLine label="Granola" connected={serviceConnected('granola')} />
               </div>
@@ -833,6 +1066,14 @@ export default function Home() {
           background: #2563eb;
           color: #ffffff;
           font-weight: 900;
+        }
+
+        .brand-logo {
+          width: 42px;
+          height: 42px;
+          border-radius: 12px;
+          object-fit: cover;
+          box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.18), 0 8px 24px rgba(168, 85, 247, 0.18);
         }
 
         .brand strong,
@@ -1096,9 +1337,109 @@ export default function Home() {
           gap: 16px;
         }
 
-        .overview-grid {
+        .splash {
+          display: grid;
+        }
+
+        .splash-card {
+          position: relative;
+          min-height: 420px;
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) 280px;
+          gap: 28px;
+          align-items: center;
+          overflow: hidden;
+          border: 1px solid rgba(124, 58, 237, 0.28);
+          border-radius: 22px;
+          background:
+            radial-gradient(circle at 78% 16%, rgba(236, 72, 153, 0.35), transparent 30%),
+            radial-gradient(circle at 95% 62%, rgba(34, 211, 238, 0.22), transparent 34%),
+            linear-gradient(135deg, #10051f 0%, #1b0b34 46%, #080a18 100%);
+          color: #ffffff;
+          padding: 34px;
+          box-shadow: 0 24px 70px rgba(17, 24, 39, 0.22);
+        }
+
+        .splash-card::before {
+          content: '';
+          position: absolute;
+          inset: 22px;
+          border: 1px solid rgba(217, 70, 239, 0.28);
+          border-radius: 999px;
+          pointer-events: none;
+        }
+
+        .splash-copy {
+          position: relative;
+          z-index: 1;
+        }
+
+        .splash-copy span {
+          display: inline-flex;
+          color: #a7f3d0;
+          font-size: 11px;
+          font-weight: 900;
+          letter-spacing: 0.1em;
+          text-transform: uppercase;
+          margin-bottom: 12px;
+        }
+
+        .splash-copy h2 {
+          max-width: 620px;
+          margin: 0 0 14px;
+          font-size: 46px;
+          line-height: 1;
+          letter-spacing: 0;
+        }
+
+        .splash-copy p {
+          max-width: 560px;
+          margin: 0;
+          color: rgba(255, 255, 255, 0.76);
+          font-size: 17px;
+        }
+
+        .ai-signal-grid {
           display: grid;
           grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 10px;
+          margin-top: 28px;
+        }
+
+        .ai-signal-grid div {
+          border: 1px solid rgba(255, 255, 255, 0.14);
+          border-radius: 14px;
+          background: rgba(255, 255, 255, 0.08);
+          padding: 12px;
+          backdrop-filter: blur(12px);
+        }
+
+        .ai-signal-grid strong,
+        .ai-signal-grid small {
+          display: block;
+        }
+
+        .ai-signal-grid small {
+          color: rgba(255, 255, 255, 0.62);
+          margin-top: 4px;
+        }
+
+        .stu-orb {
+          position: relative;
+          z-index: 1;
+        }
+
+        .stu-orb img {
+          width: 100%;
+          max-width: 280px;
+          display: block;
+          border-radius: 50%;
+          box-shadow: 0 0 34px rgba(217, 70, 239, 0.42), 0 0 70px rgba(34, 211, 238, 0.18);
+        }
+
+        .overview-grid {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
           gap: 12px;
         }
 
@@ -1330,6 +1671,93 @@ export default function Home() {
           grid-template-columns: minmax(0, 1fr) auto;
           gap: 10px;
           margin-top: 12px;
+        }
+
+        .workspace-panel {
+          background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
+        }
+
+        .workspace-map {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 10px;
+        }
+
+        .folder-card {
+          border: 1px solid #e5e7eb;
+          border-radius: 12px;
+          background: #ffffff;
+          padding: 14px;
+        }
+
+        .folder-card span,
+        .folder-card strong {
+          display: block;
+        }
+
+        .folder-card span {
+          color: #6b7280;
+          font-size: 11px;
+          font-weight: 900;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+          margin-bottom: 5px;
+        }
+
+        .folder-card strong {
+          color: #111827;
+        }
+
+        .root-folder {
+          border-color: #bfdbfe;
+          background: #eff6ff;
+        }
+
+        .workspace-actions {
+          margin-top: 14px;
+        }
+
+        .drop-zone {
+          display: grid;
+          gap: 8px;
+          border: 1px dashed #93c5fd;
+          border-radius: 16px;
+          background: #f8fbff;
+          color: #1f2937;
+          cursor: pointer;
+          padding: 24px;
+          text-align: center;
+          transition: border 150ms ease, background 150ms ease;
+        }
+
+        .drop-zone:hover {
+          border-color: #2563eb;
+          background: #eff6ff;
+        }
+
+        .drop-zone input {
+          display: none;
+        }
+
+        .drop-zone span,
+        .drop-zone strong,
+        .drop-zone small {
+          display: block;
+        }
+
+        .drop-zone span {
+          color: #111827;
+          font-size: 16px;
+          font-weight: 750;
+        }
+
+        .drop-zone strong {
+          color: #2563eb;
+          font-size: 13px;
+        }
+
+        .drop-zone small {
+          color: #6b7280;
         }
 
         .benefit-list {
@@ -1694,7 +2122,7 @@ export default function Home() {
           }
 
           .content-grid {
-            padding: 28px 18px 22px;
+            padding: 28px 18px 118px;
           }
 
           .hero-copy h1 {
@@ -1702,11 +2130,35 @@ export default function Home() {
           }
 
           .overview-grid,
+          .splash-card,
+          .ai-signal-grid,
           .field-grid,
           .preference-row,
           .integration-row,
-          .key-row {
+          .key-row,
+          .workspace-map {
             grid-template-columns: 1fr;
+          }
+
+          .splash-card {
+            min-height: 0;
+            padding: 24px;
+          }
+
+          .splash-card::before {
+            display: none;
+          }
+
+          .splash-copy h2 {
+            font-size: 34px;
+          }
+
+          .ai-signal-grid {
+            display: none;
+          }
+
+          .stu-orb {
+            display: none;
           }
 
           .integration-row {
